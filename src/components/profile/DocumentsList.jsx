@@ -17,7 +17,7 @@ const DocumentsList = () => {
   ];
 
   const handleNavigateToUniShare = () => {
-    navigate('/unishare/upload');
+    navigate('/unishare-files/upload');
   };
 
   const handleCloseUploadModal = () => {

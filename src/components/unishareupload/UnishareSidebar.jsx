@@ -12,8 +12,8 @@ const UnishareSidebar = ({ activeSection }) => {
 
   // Handle navigation within the UniShareUpload component
   const handleSectionClick = (sectionName) => {
-    // Use navigate function to navigate to the correct route without losing the component
-    navigate(`/unishare/${sectionName}`);
+    // Updated to use unishare-files instead of unishare
+    navigate(`/unishare-files/${sectionName}`);
   };
 
   return (

@@ -21,15 +21,16 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:section" element={<ProfilePage />} />
           
-          {/* Document sharing routes - specific routes first with explicitly passed sections */}
-          <Route path="/unishare/home" element={<UniShareUpload activeSection="home" />} />
-          <Route path="/unishare/upload" element={<UniShareUpload activeSection="upload" />} />
-          <Route path="/unishare/my-files" element={<UniShareUpload activeSection="my-files" />} />
-          <Route path="/unishare/history" element={<UniShareUpload activeSection="history" />} />
-          <Route path="/unishare/shared" element={<UniShareUpload activeSection="shared" />} />
-          <Route path="/unishare/trash" element={<UniShareUpload activeSection="trash" />} />
+          {/* Document sharing routes - changed to unishare-files to avoid conflicts */}
+          <Route path="/unishare-files" element={<UniShareUpload activeSection="home" />} />
+          <Route path="/unishare-files/home" element={<UniShareUpload activeSection="home" />} />
+          <Route path="/unishare-files/upload" element={<UniShareUpload activeSection="upload" />} />
+          <Route path="/unishare-files/my-files" element={<UniShareUpload activeSection="my-files" />} />
+          <Route path="/unishare-files/history" element={<UniShareUpload activeSection="history" />} />
+          <Route path="/unishare-files/shared" element={<UniShareUpload activeSection="shared" />} />
+          <Route path="/unishare-files/trash" element={<UniShareUpload activeSection="trash" />} />
           
-          {/* General unishare routes */}
+          {/* General unishare routes for groups/courses */}
           <Route path="/unishare" element={<UniSharePage />} />
           <Route path="/unishare/:section" element={<UniSharePage />} />
           

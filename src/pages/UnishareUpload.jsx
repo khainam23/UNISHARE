@@ -20,10 +20,10 @@ const UniShareUpload = ({ activeSection: propSection }) => {
   // Use the prop if available, otherwise fallback to URL param, then default to 'home'
   const activeSection = propSection || paramSection || 'home';
   
-  // If navigating directly to /unishare/upload without a section, show home by default
+  // If navigating directly to /unishare-files without a section, show home by default
   useEffect(() => {
     if (!propSection && !paramSection) {
-      navigate('/unishare/home');
+      navigate('/unishare-files/home');
     }
   }, [propSection, paramSection, navigate]);
 

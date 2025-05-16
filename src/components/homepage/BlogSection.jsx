@@ -38,7 +38,7 @@ const BlogSection = () => {
   return (
     <section className="blog-section py-5">
       <Container>
-        <h2 className="text-center mb-5">Tin tức Shop</h2>
+        <h2 className="text-center mb-5">Tin tức & Blog</h2>
         <Row>
           {blogs.map(blog => (
             <Col md={3} className="mb-4" key={blog.id}>
