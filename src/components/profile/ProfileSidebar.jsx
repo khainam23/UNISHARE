@@ -1,23 +1,62 @@
-import React from 'react';
-import { Nav, Image } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Nav, Image, Spinner } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 import {
   BsPersonCircle, BsPencilSquare, BsKey, BsFileEarmarkText, BsClockHistory,
   BsPeople, BsBook, BsGear, BsShieldCheck
 } from 'react-icons/bs';
-// Placeholder for avatar - replace with actual image path or dynamic loading
-import userAvatar from '../../assets/avatar-1.png'; // Assuming you have an avatar image
+import { authService } from '../../services';
+import defaultAvatar from '../../assets/avatar-1.png';
 
-const ProfileSidebar = () => {
-  const { section } = useParams();
+const ProfileSidebar = ({ activeSection }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        // First get from local storage
+        let userData = authService.getUser();
+        if (userData) {
+          setUser(userData);
+        }
+
+        // Then refresh from API
+        const freshUser = await authService.getCurrentUser();
+        if (freshUser) {
+          setUser(freshUser);
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+
+    // Listen for storage updates (e.g. avatar changes)
+    const handleStorageChange = () => {
+      const updatedUser = authService.getUser();
+      if (updatedUser) {
+        setUser(updatedUser);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const sidebarNavItems = [
     {
       icon: <BsPersonCircle size={20} className="me-2" />,
       text: 'Hồ sơ cá nhân',
-      basePath: 'profile', 
+      basePath: 'profile',
       subItems: [
-        { text: 'Hồ sơ tài khoản', pathSuffix: undefined, id: 'details' }, // Default, no suffix or specific id
+        { text: 'Hồ sơ tài khoản', pathSuffix: undefined, id: 'details' },
         { text: 'Chỉnh sửa thông tin', pathSuffix: 'edit', id: 'edit' },
         { text: 'Đổi mật khẩu', pathSuffix: 'change-password', id: 'change-password' }
       ]
@@ -34,9 +73,8 @@ const ProfileSidebar = () => {
     return pathSuffix ? `/${basePath}/${pathSuffix}` : `/${basePath}`;
   };
 
-  // Determine if a sub-item or main item is active
   const isActive = (item, subItem = null) => {
-    const currentSection = section || 'details'; // Default to 'details' if section is undefined
+    const currentSection = activeSection || 'details';
 
     if (subItem) {
       return currentSection === subItem.id;
@@ -47,17 +85,35 @@ const ProfileSidebar = () => {
     return currentSection === item.id;
   };
 
-
   return (
     <div className="profile-sidebar bg-white p-3 rounded shadow-sm mb-4">
       <div className="text-center mb-4">
-        <Image src={userAvatar} roundedCircle width={80} height={80} className="mb-2" />
-        <h5>Nguyễn Văn A</h5>
-        {/* Link to the edit page, assuming 'edit-basic' is the same as 'edit' for now */}
-        <Link to={getFullPath('profile', 'edit')} className="text-decoration-none text-primary small">
-          <BsPencilSquare className="me-1" /> Sửa hồ sơ
-        </Link>
+        {loading ? (
+          <div className="py-2">
+            <Spinner animation="border" size="sm" />
+          </div>
+        ) : (
+          <>
+            <Image 
+              src={user?.avatar_url || defaultAvatar} 
+              roundedCircle 
+              width={80} 
+              height={80} 
+              className="mb-2"
+              style={{ objectFit: 'cover' }}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = defaultAvatar;
+              }}
+            />
+            <h5>{user?.name || 'Người dùng'}</h5>
+            <Link to="/profile/edit" className="text-decoration-none text-primary small">
+              <BsPencilSquare className="me-1" /> Sửa hồ sơ
+            </Link>
+          </>
+        )}
       </div>
+
       <Nav className="flex-column profile-nav">
         {sidebarNavItems.map((item, index) => (
           <React.Fragment key={item.id || index}>
@@ -65,13 +121,12 @@ const ProfileSidebar = () => {
               <>
                 <Nav.Link
                   as={Link}
-                  // Link to the first subitem or the active one if applicable
                   to={getFullPath(item.basePath, item.subItems.find(sub => isActive(item, sub))?.pathSuffix || item.subItems[0].pathSuffix)}
                   className={`d-flex align-items-center ${isActive(item) ? 'active' : ''}`}
                 >
                   {item.icon} {item.text} <span className="ms-auto">{isActive(item) ? '▼' : '▶'}</span>
                 </Nav.Link>
-                {isActive(item) && ( // Show sub-items if the parent group is active
+                {isActive(item) && (
                   <Nav className="flex-column ms-3">
                     {item.subItems.map((subItem) => (
                       <Nav.Link

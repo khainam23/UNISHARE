@@ -1,91 +1,163 @@
-import React from 'react';
-import { Form, Row, Col, Button } from 'react-bootstrap';
-import {
-  BsPersonCircle, BsCalendarEvent, BsTelephone, BsEnvelope,
-  BsGeoAlt, BsGenderAmbiguous, BsBriefcase
-} from 'react-icons/bs';
+import React, { useEffect, useState } from 'react';
+import { Card, Row, Col, Button, Spinner } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import { authService } from '../../services';
 
 const ProfileForm = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Không thể tải thông tin người dùng. Vui lòng thử lại sau.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center p-4">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Đang tải thông tin...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-0 shadow-sm">
+        <Card.Body className="p-4">
+          <div className="text-center text-danger">
+            <p>{error}</p>
+            <Button variant="outline-primary" onClick={() => window.location.reload()}>
+              Thử lại
+            </Button>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  }
+
   return (
-    <Form>
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Tên</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsPersonCircle /></span>
-            <Form.Control type="text" defaultValue="Nguyễn Văn A" />
-          </div>
-        </Col>
-      </Form.Group>
+    <Card className="border-0 shadow-sm">
+      <Card.Body className="p-4">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h5 className="mb-0">Thông tin cá nhân</h5>
+          <Link to="/profile/edit">
+            <Button variant="outline-primary" size="sm">
+              <i className="fas fa-edit me-1"></i> Chỉnh sửa
+            </Button>
+          </Link>
+        </div>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Ngày Sinh</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsCalendarEvent /></span>
-            <Form.Control type="text" defaultValue="21/12/2003" />
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Họ và tên:</Col>
+          <Col sm={8}>{user?.name || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Số Điện Thoại</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsTelephone /></span>
-            <Form.Control type="tel" defaultValue="0917639460" readOnly /> {/* Corrected default value */}
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Email:</Col>
+          <Col sm={8}>{user?.email || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Email</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsEnvelope /></span>
-            <Form.Control type="email" defaultValue="nnnttt223344@gmail.com" readOnly />
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Số điện thoại:</Col>
+          <Col sm={8}>{user?.phone || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Địa Chỉ</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsGeoAlt /></span>
-            <Form.Control type="text" defaultValue="216 Núi Thành, Phường Hòa Cường Bắc, Quận Hải Châu, Thành Phố Đà Nẵng." />
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Trường đại học:</Col>
+          <Col sm={8}>{user?.university || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Giới Tính</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsGenderAmbiguous /></span>
-            <Form.Select defaultValue="Nam">
-              <option>Nam</option>
-              <option>Nữ</option>
-              <option>Khác</option>
-            </Form.Select>
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Khoa/Ngành:</Col>
+          <Col sm={8}>{user?.department || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Form.Group as={Row} className="mb-3 align-items-center">
-        <Form.Label column sm={3} className="text-muted">Vai Trò</Form.Label>
-        <Col sm={9}>
-          <div className="input-group">
-            <span className="input-group-text"><BsBriefcase /></span>
-            <Form.Control type="text" defaultValue="Học Viên" readOnly />
-          </div>
-        </Col>
-      </Form.Group>
+        <Row className="mb-3">
+          <Col sm={4} className="text-muted">Mã sinh viên:</Col>
+          <Col sm={8}>{user?.student_id || 'Chưa cập nhật'}</Col>
+        </Row>
 
-      <Button variant="primary" type="submit" className="mt-3 px-4">
-        Cập nhật hồ sơ
-      </Button>
-    </Form>
+        <Row>
+          <Col sm={4} className="text-muted">Giới thiệu:</Col>
+          <Col sm={8}>{user?.bio || 'Chưa cập nhật'}</Col>
+        </Row>
+
+        {user?.avatar_url && (
+          <Row className="mb-3">
+            <Col sm={4} className="text-muted">Ảnh đại diện:</Col>
+            <Col sm={8}>
+              <img src={user.avatar_url} alt="Avatar" className="img-fluid rounded-circle" style={{ maxWidth: '150px' }} />
+            </Col>
+          </Row>
+        )}
+
+        {user?.activity && (
+          <div className="mt-4 pt-3 border-top">
+            <h5 className="mb-3">Thống kê hoạt động</h5>
+            <Row className="g-3">
+              <Col md={6}>
+                <div className="p-3 bg-light rounded">
+                  <div className="d-flex align-items-center">
+                    <i className="fas fa-file-alt text-primary me-3 fs-4"></i>
+                    <div>
+                      <div className="fw-bold">{user.activity.documents_count || 0}</div>
+                      <div className="text-muted small">Tài liệu đã đăng</div>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="p-3 bg-light rounded">
+                  <div className="d-flex align-items-center">
+                    <i className="fas fa-users text-success me-3 fs-4"></i>
+                    <div>
+                      <div className="fw-bold">{user.activity.groups_count || 0}</div>
+                      <div className="text-muted small">Nhóm đang tham gia</div>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="p-3 bg-light rounded">
+                  <div className="d-flex align-items-center">
+                    <i className="fas fa-comment-alt text-info me-3 fs-4"></i>
+                    <div>
+                      <div className="fw-bold">{user.activity.comments_count || 0}</div>
+                      <div className="text-muted small">Bình luận</div>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+              <Col md={6}>
+                <div className="p-3 bg-light rounded">
+                  <div className="d-flex align-items-center">
+                    <i className="fas fa-clock text-warning me-3 fs-4"></i>
+                    <div>
+                      <div className="fw-bold">{user.activity.last_login_at}</div>
+                      <div className="text-muted small">Đăng nhập gần nhất</div>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+        )}
+      </Card.Body>
+    </Card>
   );
 };
 

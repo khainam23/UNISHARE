@@ -1,11 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Link } from 'react-router-dom';
-import uniShareLogo from '../assets/unishare-logo.png'; // Import logo
+import { Link, useNavigate } from 'react-router-dom';
+import { Alert } from 'react-bootstrap';
+import uniShareLogo from '../assets/unishare-logo.png';
 import registerBackground from '../assets/register-background.png';
+import { passwordService } from '../services';
 
 const ForgotPasswordPage = () => {
+  const [email, setEmail] = useState('');
+  const [captcha, setCaptcha] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
   const pageBackgroundStyle = {
     backgroundColor: '#d4eafb',
     backgroundImage: `url(${registerBackground})`,
@@ -13,6 +22,26 @@ const ForgotPasswordPage = () => {
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     minHeight: '100vh'
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // In a real implementation, you would also validate the captcha
+      await passwordService.forgotPassword(email);
+      setSuccess('Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn.');
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+    } catch (err) {
+      setError(err.message || 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,7 +61,10 @@ const ForgotPasswordPage = () => {
             <div className="forgot-password-container p-4 p-md-5 shadow-sm" style={{ backgroundColor: '#fff', borderRadius: '12px' }}>
               <h2 className="text-center mb-3" style={{ fontSize: '2rem', color: '#0070C0', fontWeight: 'bold' }}>QUÊN MẬT KHẨU</h2>
               
-              <form>
+              {error && <Alert variant="danger">{error}</Alert>}
+              {success && <Alert variant="success">{success}</Alert>}
+              
+              <form onSubmit={handleSubmit}>
                 <div className="mb-4">
                   <label htmlFor="email" className="form-label">Email đã đăng ký</label>
                   <input 
@@ -41,6 +73,9 @@ const ForgotPasswordPage = () => {
                     id="email"
                     placeholder="Nhập email của bạn" 
                     required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
                 
@@ -49,7 +84,12 @@ const ForgotPasswordPage = () => {
                     <div className="captcha-box me-2 p-2 bg-dark text-white" style={{ width: '60%', borderRadius: '5px' }}>
                       CAPTCHA
                     </div>
-                    <button type="button" className="btn btn-outline-secondary" style={{ width: '40px' }}>
+                    <button 
+                      type="button" 
+                      className="btn btn-outline-secondary" 
+                      style={{ width: '40px' }}
+                      disabled={loading}
+                    >
                       <i className="fas fa-sync-alt"></i>
                     </button>
                   </div>
@@ -61,6 +101,9 @@ const ForgotPasswordPage = () => {
                     className="form-control" 
                     placeholder="Nhập mã CAPTCHA" 
                     required 
+                    value={captcha}
+                    onChange={(e) => setCaptcha(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
                 
@@ -69,7 +112,8 @@ const ForgotPasswordPage = () => {
                     type="button" 
                     className="btn btn-secondary" 
                     style={{ width: '45%' }}
-                    onClick={() => window.history.back()}
+                    onClick={() => navigate('/login')}
+                    disabled={loading}
                   >
                     Quay lại
                   </button>
@@ -78,8 +122,9 @@ const ForgotPasswordPage = () => {
                     type="submit" 
                     className="btn btn-primary" 
                     style={{ width: '45%', backgroundColor: '#0070C0' }}
+                    disabled={loading}
                   >
-                    Tiếp tục
+                    {loading ? 'Đang xử lý...' : 'Tiếp tục'}
                   </button>
                 </div>
               </form>

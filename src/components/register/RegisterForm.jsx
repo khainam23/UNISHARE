@@ -1,224 +1,201 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { FaUser, FaPhoneAlt, FaEnvelope, FaLock, FaUserGraduate, FaSyncAlt } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { Form, Button, Alert } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import { authService } from '../../services';
+import { getRedirectPathForUser } from '../../utils/roleUtils';
 
 const RegisterForm = () => {
-  const iconStyle = { 
-    color: '#0070C0',
-    fontSize: '16px'
+  const [userData, setUserData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    password_confirmation: '',
+    university: '',
+    department: '',
+    student_id: '',
+    bio: '',
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setUserData({
+      ...userData,
+      [name]: value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!agreeTerms) {
+      setError('Bạn cần đồng ý với Điều khoản dịch vụ để tiếp tục');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await authService.register(userData);
+      const user = response.user;
+      
+      // Dispatch custom event for Header to detect login
+      window.dispatchEvent(new Event('storage'));
+      
+      // Determine redirect path based on user role
+      const redirectPath = getRedirectPathForUser(user);
+      
+      // Redirect to appropriate page
+      navigate(redirectPath);
+    } catch (err) {
+      setError(
+        err.message || 
+        'Đăng ký không thành công. Vui lòng thử lại.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form>
-      {/* Name Field */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaUser style={iconStyle} />
-          </span>
-          <input
+    <>
+      {error && <Alert variant="danger">{error}</Alert>}
+      
+      <Form onSubmit={handleSubmit}>
+        <Form.Group className="mb-3" controlId="name">
+          <Form.Label>Họ và tên</Form.Label>
+          <Form.Control
             type="text"
-            className="form-control bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
-            placeholder="Tên đầy đủ"
+            name="name"
+            value={userData.name}
+            onChange={handleChange}
+            placeholder="Nhập họ và tên"
             required
           />
-        </div>
-      </div>
-      
-      {/* Phone Field */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaPhoneAlt style={iconStyle} />
-          </span>
-          <input
-            type="tel"
-            className="form-control bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
-            placeholder="Số điện thoại"
-            required
-          />
-        </div>
-      </div>
-      
-      {/* Email Field */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaEnvelope style={iconStyle} />
-          </span>
-          <input
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="email">
+          <Form.Label>Email</Form.Label>
+          <Form.Control
             type="email"
-            className="form-control bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
-            placeholder="Email"
+            name="email"
+            value={userData.email}
+            onChange={handleChange}
+            placeholder="Nhập email"
             required
           />
-        </div>
-      </div>
-      
-      {/* Password Field */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaLock style={iconStyle} />
-          </span>
-          <input
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="phone">
+          <Form.Label>Số điện thoại</Form.Label>
+          <Form.Control
+            type="tel"
+            name="phone"
+            value={userData.phone}
+            onChange={handleChange}
+            placeholder="Nhập số điện thoại"
+            required
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="password">
+          <Form.Label>Mật khẩu</Form.Label>
+          <Form.Control
             type="password"
-            className="form-control bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
-            placeholder="Mật khẩu"
+            name="password"
+            value={userData.password}
+            onChange={handleChange}
+            placeholder="Tạo mật khẩu"
             required
           />
-        </div>
-      </div>
-      
-      {/* Confirm Password Field */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaLock style={iconStyle} />
-          </span>
-          <input
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="password_confirmation">
+          <Form.Label>Xác nhận mật khẩu</Form.Label>
+          <Form.Control
             type="password"
-            className="form-control bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
-            placeholder="Xác nhận mật khẩu"
+            name="password_confirmation"
+            value={userData.password_confirmation}
+            onChange={handleChange}
+            placeholder="Nhập lại mật khẩu"
             required
           />
-        </div>
-      </div>
-      
-      {/* User Type Dropdown */}
-      <div className="mb-3">
-        <div className="input-group">
-          <span
-            className="input-group-text bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderRight: 0,
-              borderRadius: '50px 0 0 50px'
-            }}
-          >
-            <FaUserGraduate style={iconStyle} />
-          </span>
-          <select
-            className="form-select bg-white"
-            style={{
-              border: '2px solid #0070C0',
-              borderLeft: 0,
-              borderRadius: '0 50px 50px 0'
-            }}
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="university">
+          <Form.Label>Trường đại học</Form.Label>
+          <Form.Control
+            type="text"
+            name="university"
+            value={userData.university}
+            onChange={handleChange}
+            placeholder="Nhập tên trường đại học"
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="department">
+          <Form.Label>Ngành học</Form.Label>
+          <Form.Control
+            type="text"
+            name="department"
+            value={userData.department}
+            onChange={handleChange}
+            placeholder="Nhập ngành học"
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="student_id">
+          <Form.Label>Mã sinh viên</Form.Label>
+          <Form.Control
+            type="text"
+            name="student_id"
+            value={userData.student_id}
+            onChange={handleChange}
+            placeholder="Nhập mã sinh viên"
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="terms">
+          <Form.Check
+            type="checkbox"
+            label={
+              <span>
+                Tôi đồng ý với{' '}
+                <Link to="/terms" style={{ color: '#0070C0' }}>
+                  Điều khoản dịch vụ
+                </Link>
+              </span>
+            }
+            checked={agreeTerms}
+            onChange={(e) => setAgreeTerms(e.target.checked)}
             required
-          >
-            <option value="" selected disabled>Lựa chọn vai trò</option>
-            <option value="student">Học sinh / Sinh viên</option>
-            <option value="teacher">Giáo viên / Giảng viên</option>
-            <option value="other">Khác</option>
-          </select>
+          />
+        </Form.Group>
+
+        <Button
+          variant="primary"
+          type="submit"
+          className="w-100 mb-3 py-2"
+          style={{ backgroundColor: '#0070C0' }}
+          disabled={loading || !agreeTerms}
+        >
+          {loading ? 'Đang xử lý...' : 'Đăng ký'}
+        </Button>
+
+        <div className="text-center mb-3">
+          <span>Đã có tài khoản? </span>
+          <Link to="/login" style={{ color: '#0070C0', textDecoration: 'none' }}>
+            Đăng nhập
+          </Link>
         </div>
-      </div>
-      
-      {/* CAPTCHA */}
-      <div className="mb-3 captcha-container">
-        <div className="d-flex">
-          <div
-            className="captcha-box flex-grow-1 me-2 p-2 d-flex align-items-center justify-content-center"
-            style={{
-              backgroundColor: '#000',
-              border: '2px solid #0070C0',
-              borderRadius: '5px'
-            }}
-          >
-            <span
-              className="captcha-text fw-bold fs-5 text-white"
-              style={{ letterSpacing: '2px' }}
-            >
-              678901
-            </span>
-          </div>
-          <button type="button" className="btn btn-outline-secondary" style={{ width: '40px' }}>
-            <FaSyncAlt />
-          </button>
-        </div>
-      </div>
-      
-      {/* Terms and Conditions */}
-      <div className="mb-3 form-check">
-        <input type="checkbox" className="form-check-input" id="terms" required />
-        <label className="form-check-label" htmlFor="terms">
-          <small>Tôi đồng ý với <Link to="/terms" style={{ color: '#0070C0' }}>điều kiện người dùng</Link></small>
-        </label>
-      </div>
-      
-      {/* Register Button */}
-      <div className="d-grid mb-3">
-        <button type="submit" className="btn text-white fw-bold" style={{ backgroundColor: '#0070C0', borderColor: '#0070C0', padding: '10px 0', textTransform: 'uppercase' }}>
-          Đăng Ký
-        </button>
-      </div>
-      
-      {/* Login Link */}
-      <div className="text-center mb-3">
-        <small>Đã có tài khoản? <Link to="/login" style={{ color: '#0070C0', fontWeight: 'bold' }}>Đăng nhập ngay</Link></small>
-      </div>
-    </form>
+      </Form>
+    </>
   );
 };
 
