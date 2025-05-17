@@ -98,7 +98,7 @@ const Header = () => {
                 title={
                   <>
                     <Image
-                      src={user.avatar_url || userAvatar}
+                      src={user.avatar || userAvatar}
                       roundedCircle
                       className="me-2"
                       style={{ width: '30px', height: '30px', objectFit: 'cover' }}

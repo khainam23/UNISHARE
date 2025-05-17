@@ -5,11 +5,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Alert } from 'react-bootstrap';
 import uniShareLogo from '../assets/unishare-logo.png';
 import registerBackground from '../assets/register-background.png';
-import { passwordService } from '../services';
+import { authService } from '../services';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
-  const [captcha, setCaptcha] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -31,14 +30,25 @@ const ForgotPasswordPage = () => {
     setSuccess('');
 
     try {
-      // In a real implementation, you would also validate the captcha
-      await passwordService.forgotPassword(email);
-      setSuccess('Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn.');
+      const response = await authService.forgotPassword(email);
+      setSuccess(response.message || 'Email đặt lại mật khẩu đã được gửi');
+      setEmail('');
       setTimeout(() => {
         navigate('/login');
       }, 3000);
     } catch (err) {
-      setError(err.message || 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+      console.error('Password reset error:', err);
+      if (err.response && err.response.data) {
+        if (err.response.data.errors && err.response.data.errors.email) {
+          setError(err.response.data.errors.email[0]);
+        } else if (err.response.data.message) {
+          setError(err.response.data.message);
+        } else {
+          setError('Có lỗi xảy ra khi gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau.');
+        }
+      } else {
+        setError('Có lỗi xảy ra khi gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau.');
+      }
     } finally {
       setLoading(false);
     }
@@ -75,34 +85,6 @@ const ForgotPasswordPage = () => {
                     required 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                
-                <div className="mb-4">
-                  <div className="d-flex align-items-center">
-                    <div className="captcha-box me-2 p-2 bg-dark text-white" style={{ width: '60%', borderRadius: '5px' }}>
-                      CAPTCHA
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn btn-outline-secondary" 
-                      style={{ width: '40px' }}
-                      disabled={loading}
-                    >
-                      <i className="fas fa-sync-alt"></i>
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Nhập mã CAPTCHA" 
-                    required 
-                    value={captcha}
-                    onChange={(e) => setCaptcha(e.target.value)}
                     disabled={loading}
                   />
                 </div>

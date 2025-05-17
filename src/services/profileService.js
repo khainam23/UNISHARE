@@ -85,7 +85,7 @@ const profileService = {
    */
   getUserHistory: async (params = {}) => {
     try {
-      const response = await api.get('/auth/history', { params });
+      const response = await api.get('/user/history', { params });
       return response.data;
     } catch (error) {
       throw error.response ? error.response.data : error;

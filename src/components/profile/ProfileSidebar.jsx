@@ -95,7 +95,7 @@ const ProfileSidebar = ({ activeSection }) => {
         ) : (
           <>
             <Image 
-              src={user?.avatar_url || defaultAvatar} 
+              src={user?.avatar || defaultAvatar} 
               roundedCircle 
               width={80} 
               height={80} 

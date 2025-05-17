@@ -1,25 +1,48 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaEnvelope, FaSyncAlt } from 'react-icons/fa';
+import { authService } from '../../services';
+import { Alert } from 'react-bootstrap';
 
 const ForgotPasswordForm = () => {
   const [email, setEmail] = useState('');
   const [captcha, setCaptcha] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset states
+    setError('');
+    setSuccess('');
     setIsSubmitting(true);
     
-    // Here you would handle the forgot password request
-    // For now, we'll simulate navigation to the next screen
-    setTimeout(() => {
-      window.location.href = '/reset-password';
-    }, 1000);
+    try {
+      // Call the forgot password API
+      const response = await authService.forgotPassword(email);
+      setSuccess(response.message || 'Email đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư của bạn.');
+      
+      // Clear form
+      setEmail('');
+      setCaptcha('');
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      setError(
+        err.message || 
+        'Không thể gửi email đặt lại mật khẩu. Vui lòng kiểm tra kết nối và thử lại.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
+      
       <div className="mb-4">
         <div className="input-group">
           <span className="input-group-text" style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}>
@@ -78,7 +101,7 @@ const ForgotPasswordForm = () => {
             border: 'none'
           }}
         >
-          Tiếp tục
+          {isSubmitting ? 'Đang xử lý...' : 'Tiếp tục'}
         </button>
       </div>
 

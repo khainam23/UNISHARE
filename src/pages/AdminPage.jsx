@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/admin/Layout';
 import Dashboard from '../components/admin/Dashboard';
-import { Container, Row, Col, Card, Button, Nav, Form } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Nav, Form, Spinner, Alert } from 'react-bootstrap';
 import DocumentPreview from '../components/admin/DocumentPreview';
 import { FaStar } from 'react-icons/fa';
 import { 
@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fa';
 import reactIcon from '../assets/react-icon.png';
 import avatarPlaceholder from '../assets/avatar-1.png';
+import { adminService } from '../services';
 
 const AdminPage = () => {
   // Get tab from URL params and navigation function
@@ -31,6 +32,18 @@ const AdminPage = () => {
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   
+  // Add loading and error states
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Add state for API data
+  const [stats, setStats] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [permissionUsers, setPermissionUsers] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  
   // Update activeTab when URL parameter changes
   useEffect(() => {
     if (tab) {
@@ -40,163 +53,261 @@ const AdminPage = () => {
     }
   }, [tab]);
 
-  // Stats data
-  const stats = [
-    { title: 'Tổng người dùng', value: '1,856', icon: FaUsers, color: '#0370B7', bgColor: '#E6F3FB' },
-    { title: 'Tài liệu đã duyệt', value: '245', icon: FaBook, color: '#28A745', bgColor: '#E8F9EF' },
-    { title: 'Chờ duyệt', value: '35', icon: FaFileAlt, color: '#FFC107', bgColor: '#FFF8E6' },
-    { title: 'Đơn hàng', value: '68', icon: FaShoppingCart, color: '#6F42C1', bgColor: '#F0E7FA' }
-  ];
-
-  // Users data
-  const users = [
-    { id: 1, name: 'Nguyễn Nhân Tính', role: 'Học sinh' },
-    { id: 2, name: 'User 2', role: 'Học sinh' },
-    { id: 3, name: 'User 3', role: 'Học sinh' },
-    { id: 4, name: 'User 4', role: 'Giảng viên' },
-    { id: 5, name: 'User 5', role: 'Học sinh' },
-    { id: 6, name: 'User 6', role: 'Học sinh' },
-    { id: 7, name: 'User 7', role: 'Giảng viên' },
-    { id: 8, name: 'User 8', role: 'Học sinh' },
-    { id: 9, name: 'User 9', role: 'Học sinh' },
-    { id: 10, name: 'User 10', role: 'Học sinh' }
-  ];
-
-  // Messages data
-  const messages = [
-    {
-      id: 1,
-      title: 'Học React-JS cơ bản',
-      content: 'Thông báo từ lớp học...',
-      timestamp: '11/03/2023 9:26 PM',
-    },
-    {
-      id: 2,
-      title: 'Học React-JS cơ bản',
-      content: 'Thông báo từ lớp học...',
-      timestamp: '11/03/2023 9:26 PM',
-    },
-    {
-      id: 3,
-      title: 'Học React-JS cơ bản',
-      content: 'Thông báo từ lớp học...',
-      timestamp: '11/03/2023 9:26 PM',
-    },
-    {
-      id: 4,
-      title: 'Học React-JS cơ bản',
-      content: 'Thông báo từ lớp học...',
-      timestamp: '11/03/2023 9:26 PM',
-    },
-    {
-      id: 5,
-      title: 'Học React-JS cơ bản',
-      content: 'Thông báo từ lớp học...',
-      timestamp: '11/03/2023 9:26 PM',
-    },
-  ];
-
-  // Permissions data
-  const permissionUsers = [
-    {
-      id: 1,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 2,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 3,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 4,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 5,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 6,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'teacher'
-    },
-    {
-      id: 7,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'student'
-    },
-    {
-      id: 8,
-      name: 'Nguyễn Đình Mẫn',
-      role: 'Co sở dữ liệu',
-      photo: avatarPlaceholder,
-      type: 'student'
-    },
-  ];
+  // Fetch dashboard stats when dashboard tab is active
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      fetchDashboardStats();
+    }
+  }, [activeTab]);
   
-  // Reports data
-  const reports = [
-    {
-      id: 1,
-      document: 'Toán cao cấp c2',
-      content: 'Nội dung tài liệu chưa được chính xác',
-      reporterEmail: 'nnnttt223344@gmail.com'
-    },
-    {
-      id: 2,
-      document: 'Toán cao cấp c2',
-      content: 'Nội dung tài liệu chưa được chính xác',
-      reporterEmail: 'nnnttt223344@gmail.com'
-    },
-    {
-      id: 3,
-      document: 'Toán cao cấp c2',
-      content: 'Nội dung tài liệu chưa được chính xác',
-      reporterEmail: 'nnnttt223344@gmail.com'
-    },
-    {
-      id: 4,
-      document: 'Toán cao cấp c2',
-      content: 'Nội dung tài liệu chưa được chính xác',
-      reporterEmail: 'nnnttt223344@gmail.com'
-    },
-    {
-      id: 5,
-      document: 'Toán cao cấp c2',
-      content: 'Nội dung tài liệu chưa được chính xác',
-      reporterEmail: 'nnnttt223344@gmail.com'
-    },
-  ];
-
-  // Teachers data
-  const teachers = [
-    { id: 1, name: 'Nguyễn Văn Nam', rating: '5.0/5.0', image: 'https://i.pravatar.cc/150?img=11' },
-    { id: 2, name: 'Nguyễn Thái Văn', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=12' },
-    { id: 3, name: 'Nguyễn Thái Nhân', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=13' },
-    { id: 4, name: 'Nguyễn Văn Minh', rating: '4.7/5.0', image: 'https://i.pravatar.cc/150?img=14' }
-  ];
+  // Fetch users when users tab is active
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [activeTab]);
+  
+  // Fetch messages when messages tab is active
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      fetchMessages();
+    }
+  }, [activeTab]);
+  
+  // Fetch permission users when permissions tab is active
+  useEffect(() => {
+    if (activeTab === 'permissions') {
+      fetchPermissionUsers();
+    }
+  }, [activeTab]);
+  
+  // Fetch reports when reports tab is active
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
+  }, [activeTab]);
+  
+  // Fetch favorite teachers for dashboard
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      fetchTeachers();
+    }
+  }, [activeTab]);
+  
+  // API fetch functions
+  const fetchDashboardStats = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const data = await adminService.getDashboardStats();
+      
+      // Transform the data into the format our component expects
+      const formattedStats = [
+        { 
+          title: 'Tổng người dùng', 
+          value: data.users?.total.toLocaleString() || '0', 
+          icon: FaUsers, 
+          color: '#0370B7', 
+          bgColor: '#E6F3FB' 
+        },
+        { 
+          title: 'Tài liệu đã duyệt', 
+          value: data.content?.documents?.approved.toLocaleString() || '0', 
+          icon: FaBook, 
+          color: '#28A745', 
+          bgColor: '#E8F9EF' 
+        },
+        { 
+          title: 'Chờ duyệt', 
+          value: data.reports?.pending.toLocaleString() || '0', 
+          icon: FaFileAlt, 
+          color: '#FFC107', 
+          bgColor: '#FFF8E6' 
+        },
+        { 
+          title: 'Đơn hàng', 
+          value: data.orders?.total.toLocaleString() || '0', 
+          icon: FaShoppingCart, 
+          color: '#6F42C1', 
+          bgColor: '#F0E7FA' 
+        }
+      ];
+      
+      setStats(formattedStats);
+    } catch (err) {
+      console.error('Failed to fetch dashboard stats:', err);
+      setError('Failed to load dashboard statistics. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await adminService.getUsers();
+      
+      // Format users data for our component
+      const formattedUsers = response.data?.map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.roles?.[0]?.name === 'admin' ? 'Admin' : 
+              user.roles?.[0]?.name === 'moderator' ? 'Người kiểm duyệt' :
+              user.roles?.[0]?.name === 'lecturer' ? 'Giảng viên' : 'Học sinh'
+      })) || [];
+      
+      setUsers(formattedUsers);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setError('Failed to load user data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchMessages = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await adminService.getMessages();
+      
+      // For now, we'll keep using mock data for messages
+      // In a real implementation, you'd format the API response
+      setMessages([
+        {
+          id: 1,
+          title: 'Học React-JS cơ bản',
+          content: 'Thông báo từ lớp học...',
+          timestamp: '11/03/2023 9:26 PM',
+        },
+        {
+          id: 2,
+          title: 'Học React-JS cơ bản',
+          content: 'Thông báo từ lớp học...',
+          timestamp: '11/03/2023 9:26 PM',
+        },
+        {
+          id: 3,
+          title: 'Học React-JS cơ bản',
+          content: 'Thông báo từ lớp học...',
+          timestamp: '11/03/2023 9:26 PM',
+        },
+        {
+          id: 4,
+          title: 'Học React-JS cơ bản',
+          content: 'Thông báo từ lớp học...',
+          timestamp: '11/03/2023 9:26 PM',
+        },
+        {
+          id: 5,
+          title: 'Học React-JS cơ bản',
+          content: 'Thông báo từ lớp học...',
+          timestamp: '11/03/2023 9:26 PM',
+        },
+      ]);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+      setError('Failed to load messages data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchPermissionUsers = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const rolesToFetch = permissionTab === 'teacher' ? ['lecturer'] : ['student'];
+      const response = await adminService.getUsers({ role: rolesToFetch.join(',') });
+      
+      // Format users data for permissions tab
+      const formattedUsers = response.data?.map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.department || 'Không có thông tin',
+        photo: user.avatar || avatarPlaceholder,
+        type: permissionTab
+      })) || [];
+      
+      setPermissionUsers(formattedUsers);
+    } catch (err) {
+      console.error('Failed to fetch permission users:', err);
+      setError('Failed to load user permissions data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchReports = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await adminService.getReports();
+      
+      // Format reports data for our component
+      const formattedReports = response.data?.map(report => ({
+        id: report.id,
+        document: report.reportable_type === 'App\\Models\\Document' ? 
+          report.reportable?.title || 'Tài liệu đã bị xóa' : 
+          'Nội dung khác',
+        content: report.reason || 'Không có lý do cụ thể',
+        reporterEmail: report.reporter?.email || 'Không xác định'
+      })) || [];
+      
+      setReports(formattedReports);
+    } catch (err) {
+      console.error('Failed to fetch reports:', err);
+      setError('Failed to load reports data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchTeachers = async () => {
+    setLoading(true);
+    
+    try {
+      const response = await adminService.getTeachers({ sort: 'rating', limit: 4 });
+      
+      // Format teachers data for our component
+      const formattedTeachers = response.data?.map(teacher => ({
+        id: teacher.id,
+        name: teacher.name,
+        rating: teacher.rating?.toFixed(1) + '/5.0' || '4.5/5.0',
+        image: teacher.avatar || `https://i.pravatar.cc/150?img=${10 + teacher.id % 10}`
+      })) || [];
+      
+      if (formattedTeachers.length > 0) {
+        setTeachers(formattedTeachers);
+      } else {
+        // Fallback to mock data if no teachers found
+        setTeachers([
+          { id: 1, name: 'Nguyễn Văn Nam', rating: '5.0/5.0', image: 'https://i.pravatar.cc/150?img=11' },
+          { id: 2, name: 'Nguyễn Thái Văn', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=12' },
+          { id: 3, name: 'Nguyễn Thái Nhân', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=13' },
+          { id: 4, name: 'Nguyễn Văn Minh', rating: '4.7/5.0', image: 'https://i.pravatar.cc/150?img=14' }
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch teachers:', err);
+      // Fallback to mock data if API fails
+      setTeachers([
+        { id: 1, name: 'Nguyễn Văn Nam', rating: '5.0/5.0', image: 'https://i.pravatar.cc/150?img=11' },
+        { id: 2, name: 'Nguyễn Thái Văn', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=12' },
+        { id: 3, name: 'Nguyễn Thái Nhân', rating: '4.8/5.0', image: 'https://i.pravatar.cc/150?img=13' },
+        { id: 4, name: 'Nguyễn Văn Minh', rating: '4.7/5.0', image: 'https://i.pravatar.cc/150?img=14' }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter users based on permission tab
   const filteredPermissionUsers = permissionUsers.filter(user => user.type === permissionTab);
@@ -208,9 +319,30 @@ const AdminPage = () => {
     setIsEditMode(true);
   };
   
-  const handleSavePermissions = () => {
-    // Save logic would go here
-    setIsEditMode(false);
+  const handleSavePermissions = async () => {
+    if (!selectedUser) return;
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Convert displayed role to backend role value
+      const roleValue = selectedRole === 'Giảng Viên' ? 'lecturer' : 
+                         selectedRole === 'Sinh Viên' ? 'student' : 
+                         selectedRole === 'Quản trị viên' ? 'admin' : 'student';
+      
+      await adminService.updateUserRole(selectedUser.id, roleValue);
+      
+      // Refresh the user list after update
+      fetchPermissionUsers();
+      setIsEditMode(false);
+      setSelectedUser(null);
+    } catch (err) {
+      console.error('Failed to update permissions:', err);
+      setError('Failed to update permissions. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleCancelEdit = () => {
@@ -219,13 +351,43 @@ const AdminPage = () => {
   };
 
   // Report handlers
-  const handleInspect = (report) => {
-    setSelectedReport(report);
-    setShowDocumentPreview(true);
+  const handleInspect = async (report) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const reportDetails = await adminService.getReportDetails(report.id);
+      setSelectedReport({
+        ...report,
+        details: reportDetails
+      });
+      setShowDocumentPreview(true);
+    } catch (err) {
+      console.error('Failed to fetch report details:', err);
+      setError('Failed to load report details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id) => {
-    console.log(`Deleting report ${id}`);
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) {
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      await adminService.resolveReport(id, 'reject', 'Report rejected by admin');
+      // Refresh reports list
+      fetchReports();
+    } catch (err) {
+      console.error('Failed to delete report:', err);
+      setError('Failed to delete report. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClosePreview = () => {
@@ -233,10 +395,40 @@ const AdminPage = () => {
     setSelectedReport(null);
   };
 
-  const handleDeleteDocument = () => {
-    console.log(`Deleting document for report ${selectedReport?.id}`);
-    setShowDocumentPreview(false);
-    setSelectedReport(null);
+  const handleDeleteDocument = async () => {
+    if (!selectedReport || !selectedReport.details?.reportable?.id) {
+      setShowDocumentPreview(false);
+      setSelectedReport(null);
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Delete the document
+      await adminService.deleteDocument(
+        selectedReport.details.reportable.id,
+        'Deleted due to report: ' + selectedReport.content
+      );
+      
+      // Mark report as resolved
+      await adminService.resolveReport(
+        selectedReport.id,
+        'resolve',
+        'Document deleted due to valid report'
+      );
+      
+      // Refresh reports list and close preview
+      fetchReports();
+      setShowDocumentPreview(false);
+      setSelectedReport(null);
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      setError('Failed to delete document. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Function to handle tab changes with navigation
@@ -244,6 +436,13 @@ const AdminPage = () => {
     setActiveTab(tabName);
     navigate(`/admin/${tabName}`);
   };
+  
+  // Handle permission tab change
+  useEffect(() => {
+    if (activeTab === 'permissions') {
+      fetchPermissionUsers();
+    }
+  }, [permissionTab, activeTab]);
 
   // If showing document preview from Reports
   if (showDocumentPreview) {
@@ -252,6 +451,8 @@ const AdminPage = () => {
         report={selectedReport} 
         onClose={handleClosePreview}
         onDelete={handleDeleteDocument}
+        loading={loading}
+        error={error}
       />
     );
   }
@@ -264,6 +465,8 @@ const AdminPage = () => {
           <Card className="border-0 shadow-sm">
             <Card.Body className="p-4">
               <h5 className="mb-4 fw-normal">Quản Lý Phân Quyền / Chỉnh sửa Quyền</h5>
+              
+              {error && <Alert variant="danger">{error}</Alert>}
               
               <div className="permission-form">
                 <div className="mb-4">
@@ -281,9 +484,11 @@ const AdminPage = () => {
                         padding: '8px 12px',
                         fontSize: '14px'
                       }}
+                      disabled={loading}
                     >
                       <option value="Giảng Viên">Giảng Viên</option>
                       <option value="Sinh Viên">Sinh Viên</option>
+                      <option value="Quản trị viên">Quản trị viên</option>
                     </Form.Select>
                   </div>
                 </div>
@@ -301,6 +506,7 @@ const AdminPage = () => {
                       backgroundColor: '#f8f9fa',
                       borderColor: '#dee2e6'
                     }}
+                    disabled={loading}
                   >
                     Thoát
                   </Button>
@@ -315,8 +521,9 @@ const AdminPage = () => {
                       backgroundColor: '#253B80',
                       borderColor: '#253B80'
                     }}
+                    disabled={loading}
                   >
-                    Cập nhật
+                    {loading ? <Spinner size="sm" animation="border" /> : 'Cập nhật'}
                   </Button>
                 </div>
               </div>
@@ -333,6 +540,9 @@ const AdminPage = () => {
       <div className="mb-4">
         <h4 className="mb-0 fw-bold">Dashboard</h4>
       </div>
+      
+      {/* Error display */}
+      {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
       
       {/* Tab Navigation */}
       <Nav className="mb-4" variant="tabs">
@@ -398,8 +608,17 @@ const AdminPage = () => {
         </Nav.Item>
       </Nav>
       
+      {loading && (
+        <div className="text-center py-4">
+          <Spinner animation="border" role="status" variant="primary">
+            <span className="visually-hidden">Loading...</span>
+          </Spinner>
+          <p className="mt-2 text-muted">Đang tải dữ liệu...</p>
+        </div>
+      )}
+      
       {/* Dashboard Tab Content */}
-      {activeTab === 'dashboard' && (
+      {!loading && activeTab === 'dashboard' && (
         <>
           {/* Welcome Banner */}
           <Dashboard />
@@ -597,7 +816,7 @@ const AdminPage = () => {
       )}
 
       {/* Users Tab Content */}
-      {activeTab === 'users' && (
+      {!loading && activeTab === 'users' && (
         <>
           <div className="mb-4">
             <h5 className="mb-0 fw-bold">Quản Lý Người Dùng</h5>
@@ -663,7 +882,7 @@ const AdminPage = () => {
       )}
 
       {/* Messages Tab Content */}
-      {activeTab === 'messages' && (
+      {!loading && activeTab === 'messages' && (
         <>
           <div className="mb-4">
             <h5 className="mb-0 fw-bold">Tin Nhắn</h5>
@@ -737,7 +956,7 @@ const AdminPage = () => {
       )}
 
       {/* Permissions Tab Content */}
-      {activeTab === 'permissions' && (
+      {!loading && activeTab === 'permissions' && (
         <Card className="border-0 rounded-4 p-0">
           <Card.Body className="p-4">
             <h5 className="mb-4">Quản Lý Phân Quyền</h5>
@@ -784,6 +1003,10 @@ const AdminPage = () => {
                         src={user.photo}
                         alt={user.name}
                         style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = avatarPlaceholder;
+                        }}
                       />
                     </div>
                     <div>
@@ -817,7 +1040,7 @@ const AdminPage = () => {
       )}
 
       {/* Reports Tab Content */}
-      {activeTab === 'reports' && (
+      {!loading && activeTab === 'reports' && (
         <Card className="border-0 rounded-4 p-3">
           <Card.Body>
             <h5 className="mb-4">Quản Lý Báo Cáo</h5>

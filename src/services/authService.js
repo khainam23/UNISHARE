@@ -1,9 +1,13 @@
-import api from './api';
+import api, { getCsrfToken } from './api';
+import passwordService from './passwordService';
 
 const authService = {
   // Register a new user
   register: async (userData) => {
     try {
+      // Get CSRF token before making the request
+      await getCsrfToken();
+      
       const response = await api.post('/auth/register', userData);
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
@@ -18,6 +22,9 @@ const authService = {
   // Login user
   login: async (credentials) => {
     try {
+      // Get CSRF token before making the request
+      await getCsrfToken();
+      
       const response = await api.post('/auth/login', credentials);
       if (response.data.token) {
         // Make sure we're storing the complete user object with roles
@@ -34,6 +41,9 @@ const authService = {
   // Logout user
   logout: async () => {
     try {
+      // Get CSRF token before making the request
+      await getCsrfToken();
+      
       await api.post('/auth/logout');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -90,6 +100,15 @@ const authService = {
       console.error('Failed to refresh user info:', error);
       return null;
     }
+  },
+
+  // Forgot password request
+  forgotPassword: async (email) => {
+    return passwordService.forgotPassword(email);
+  },
+  
+  resetPassword: async (data) => {
+    return passwordService.resetPassword(data);
   }
 };
 

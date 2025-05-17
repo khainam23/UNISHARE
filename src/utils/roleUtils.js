@@ -17,21 +17,27 @@ export const hasRole = (user, roleName) => {
 };
 
 /**
- * Check if the user is an admin
- * @param {Object} user - The user object
- * @returns {Boolean} - True if the user is an admin
+ * Check if user has admin role
+ * @param {Object} user - The user object with roles array
+ * @returns {Boolean} true if user has admin role
  */
 export const isAdmin = (user) => {
-  return hasRole(user, 'admin');
+  if (!user || !user.roles || !Array.isArray(user.roles)) {
+    return false;
+  }
+  return user.roles.some(role => role.name === 'admin');
 };
 
 /**
- * Check if the user is a moderator
- * @param {Object} user - The user object
- * @returns {Boolean} - True if the user is a moderator
+ * Check if user has moderator role
+ * @param {Object} user - The user object with roles array
+ * @returns {Boolean} true if user has moderator role
  */
 export const isModerator = (user) => {
-  return hasRole(user, 'moderator');
+  if (!user || !user.roles || !Array.isArray(user.roles)) {
+    return false;
+  }
+  return user.roles.some(role => role.name === 'moderator');
 };
 
 /**
@@ -53,20 +59,30 @@ export const isStudent = (user) => {
 };
 
 /**
- * Get the redirect path based on user role
- * @param {Object} user - The user object
- * @returns {String} - The redirect path
+ * Determine redirect path based on user role
+ * @param {Object} user - The user object with roles
+ * @returns {String} The path to redirect to
  */
 export const getRedirectPathForUser = (user) => {
-  if (!user) return '/login';
+  if (!user) {
+    return '/login';
+  }
   
+  // First, check for admin role - highest priority
   if (isAdmin(user)) {
-    return '/admin';
+    return '/admin/dashboard';
   }
   
+  // Second, check for moderator role
   if (isModerator(user)) {
-    return '/admin';
+    return '/admin/dashboard';
   }
   
+  // Third, check for teacher role
+  if (user.roles && user.roles.some(role => role.name === 'teacher')) {
+    return '/teacher/dashboard';
+  }
+  
+  // Default to home page for students or other roles
   return '/';
 };

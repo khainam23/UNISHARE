@@ -1,11 +1,6 @@
-import api from './api';
+import api, { getCsrfToken } from './api';
 import authService from './authService';
-import passwordService from './passwordService';
 import profileService from './profileService';
+import adminService from './adminService';
 
-export {
-  api,
-  authService,
-  passwordService,
-  profileService
-};
+export { api, getCsrfToken, authService, profileService, adminService };

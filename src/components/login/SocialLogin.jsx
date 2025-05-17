@@ -18,9 +18,6 @@ const SocialLogin = () => {
           </Link>
         </div>
       </div>
-      <div className="text-center mt-4"> {/* Increased margin top */}
-        <p>Không có tài khoản? <Link to="/register" className="fw-bold" style={{color: '#007bff'}}>Đăng ký ngay</Link></p>
-      </div>
     </>
   );
 };

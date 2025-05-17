@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Alert } from 'react-bootstrap';
 import uniShareLogo from '../assets/unishare-logo.png';
 import registerBackground from '../assets/register-background.png';
-import { FaSync } from 'react-icons/fa';
+import passwordService from '../services/passwordService';
 
 const ResetPasswordPage = () => {
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [captcha, setCaptcha] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [token, setToken] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const pageBackgroundStyle = {
     backgroundColor: '#d4eafb',
@@ -20,15 +27,73 @@ const ResetPasswordPage = () => {
     minHeight: '100vh'
   };
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    // Extract token and email from URL query parameters
+    const queryParams = new URLSearchParams(location.search);
+    const tokenParam = queryParams.get('token');
+    const emailParam = queryParams.get('email');
+
+    if (!tokenParam || !emailParam) {
+      setError('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+      return;
+    }
+
+    setToken(tokenParam);
+    setEmail(emailParam);
+  }, [location.search]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle password reset logic here
-    console.log('Password reset submitted');
+    
+    // Validate passwords
+    if (password !== passwordConfirmation) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await passwordService.resetPassword({
+        token,
+        email,
+        password,
+        password_confirmation: passwordConfirmation
+      });
+      
+      setSuccess(response.message || 'Mật khẩu đã được đặt lại thành công.');
+      setPassword('');
+      setPasswordConfirmation('');
+      
+      // Redirect to login page after success
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+    } catch (err) {
+      console.error('Password reset error:', err);
+      if (err.errors) {
+        // Handle validation errors
+        const errorMessages = Object.values(err.errors).flat();
+        setError(errorMessages.join(', '));
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Có lỗi xảy ra khi đặt lại mật khẩu. Vui lòng thử lại sau.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
-    // Navigate back or to login
-    window.history.back();
+    navigate('/login');
   };
 
   return (
@@ -38,8 +103,8 @@ const ResetPasswordPage = () => {
       <div className="container mt-4">
         <div className="d-flex justify-content-between align-items-center">
           <span className="breadcrumb-text" style={{ color: '#333' }}>Trang chủ &gt; Đặt lại mật khẩu</span>
-          <Link to="/" className="back-link" style={{ color: '#003366', fontWeight: 500 }}>
-            Đăng xuất <i className="fas fa-sign-out-alt"></i>
+          <Link to="/login" className="back-link" style={{ color: '#003366', fontWeight: 500 }}>
+            Đăng nhập <i className="fas fa-sign-in-alt"></i>
           </Link>
         </div>
       </div>
@@ -52,60 +117,49 @@ const ResetPasswordPage = () => {
                 ĐẶT LẠI MẬT KHẨU
               </h2>
 
-              <p className="text-center mb-4 small text-muted">
-                Đã gửi liên kết xác nhận vào email của bạn:
-              </p>
+              {email && (
+                <p className="text-center mb-4 small text-muted">
+                  Đặt lại mật khẩu cho tài khoản: <strong>{email}</strong>
+                </p>
+              )}
+
+              {error && <Alert variant="danger">{error}</Alert>}
+              {success && <Alert variant="success">{success}</Alert>}
 
               <form onSubmit={handleSubmit}>
                 {/* New Password Field */}
                 <div className="mb-3">
-                  <label htmlFor="newPassword" className="form-label">
+                  <label htmlFor="password" className="form-label">
                     Mật khẩu mới <span className="text-danger">*</span>
                   </label>
                   <input
                     type="password"
                     className="form-control"
-                    id="newPassword"
+                    id="password"
                     placeholder="Nhập mật khẩu mới"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={loading || !token || !email}
+                    minLength={8}
                   />
                 </div>
 
                 {/* Confirm Password Field */}
                 <div className="mb-4">
-                  <label htmlFor="confirmPassword" className="form-label">
+                  <label htmlFor="passwordConfirmation" className="form-label">
                     Xác nhận mật khẩu mới <span className="text-danger">*</span>
                   </label>
                   <input
                     type="password"
                     className="form-control"
-                    id="confirmPassword"
+                    id="passwordConfirmation"
                     placeholder="Xác nhận mật khẩu mới"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    value={passwordConfirmation}
+                    onChange={(e) => setPasswordConfirmation(e.target.value)}
                     required
-                  />
-                </div>
-
-                {/* CAPTCHA */}
-                <div className="mb-3">
-                  <div className="d-flex align-items-center mb-2">
-                    <div className="captcha-box me-2 bg-dark text-white px-4 py-2" style={{ borderRadius: '4px' }}>
-                      67R90
-                    </div>
-                    <button type="button" className="btn btn-outline-secondary" style={{ height: '38px', width: '38px' }}>
-                      <FaSync />
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="CAPTCHA"
-                    value={captcha}
-                    onChange={(e) => setCaptcha(e.target.value)}
-                    required
+                    disabled={loading || !token || !email}
+                    minLength={8}
                   />
                 </div>
 
@@ -115,6 +169,7 @@ const ResetPasswordPage = () => {
                     type="button"
                     onClick={handleCancel}
                     className="btn btn-outline-secondary flex-grow-1"
+                    disabled={loading}
                   >
                     Quay lại
                   </button>
@@ -122,8 +177,9 @@ const ResetPasswordPage = () => {
                     type="submit"
                     className="btn btn-primary flex-grow-1"
                     style={{ backgroundColor: '#0070C0' }}
+                    disabled={loading || !token || !email}
                   >
-                    Xác nhận
+                    {loading ? 'Đang xử lý...' : 'Xác nhận'}
                   </button>
                 </div>
               </form>

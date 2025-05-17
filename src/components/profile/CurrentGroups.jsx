@@ -118,7 +118,7 @@ const CurrentGroups = () => {
                     {group.creator && (
                       <>
                         <Image 
-                          src={group.creator.avatar_url || defaultAvatar} 
+                          src={group.creator.avatar || defaultAvatar} 
                           roundedCircle 
                           width={40} 
                           height={40} 

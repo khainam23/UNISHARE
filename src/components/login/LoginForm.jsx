@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Alert } from 'react-bootstrap';
 import { authService } from '../../services';
-import { getRedirectPathForUser } from '../../utils/roleUtils';
+import { getRedirectPathForUser, isAdmin } from '../../utils/roleUtils';
 
 const LoginForm = () => {
   const [credentials, setCredentials] = useState({
@@ -36,6 +36,11 @@ const LoginForm = () => {
       
       // Determine redirect path based on user role
       const redirectPath = getRedirectPathForUser(user);
+      
+      // Log the redirect for admin users
+      if (isAdmin(user)) {
+        console.log("Admin user logged in. Redirecting to admin dashboard.");
+      }
       
       // Redirect to appropriate page
       navigate(redirectPath);

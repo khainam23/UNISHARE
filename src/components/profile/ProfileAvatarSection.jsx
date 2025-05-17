@@ -80,7 +80,7 @@ const ProfileAvatarSection = () => {
             </div>
           )}
           <Image 
-            src={user?.avatar_url || userDefaultAvatar} 
+            src={user?.avatar || userDefaultAvatar} 
             alt="User Avatar" 
             roundedCircle 
             className="mb-3"

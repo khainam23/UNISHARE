@@ -96,15 +96,6 @@ const ProfileForm = () => {
           <Col sm={8}>{user?.bio || 'Chưa cập nhật'}</Col>
         </Row>
 
-        {user?.avatar_url && (
-          <Row className="mb-3">
-            <Col sm={4} className="text-muted">Ảnh đại diện:</Col>
-            <Col sm={8}>
-              <img src={user.avatar_url} alt="Avatar" className="img-fluid rounded-circle" style={{ maxWidth: '150px' }} />
-            </Col>
-          </Row>
-        )}
-
         {user?.activity && (
           <div className="mt-4 pt-3 border-top">
             <h5 className="mb-3">Thống kê hoạt động</h5>
