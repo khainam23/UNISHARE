@@ -1,29 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext } from 'react';
 import { Card, Row, Col, Button, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { authService } from '../../services';
+import { ProfileContext } from '../../pages/ProfilePage';
 
 const ProfileForm = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setLoading(true);
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-        setError('Không thể tải thông tin người dùng. Vui lòng thử lại sau.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, []);
+  // Use the shared context instead of making separate API calls
+  const { userData: user, loading, error, refreshUserData } = useContext(ProfileContext);
 
   if (loading) {
     return (
@@ -40,7 +22,7 @@ const ProfileForm = () => {
         <Card.Body className="p-4">
           <div className="text-center text-danger">
             <p>{error}</p>
-            <Button variant="outline-primary" onClick={() => window.location.reload()}>
+            <Button variant="outline-primary" onClick={() => refreshUserData(true)}>
               Thử lại
             </Button>
           </div>

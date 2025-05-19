@@ -6,8 +6,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest', // Important for Laravel to recognize AJAX requests
   },
-  withCredentials: true,
+  withCredentials: true, // Enable passing cookies for CORS requests
+  timeout: 10000, // 10 second timeout
 });
 
 // Store the baseURL for reference in other functions
@@ -21,6 +23,11 @@ api.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
     }
     
+    // Ensure content type is set for all requests except FormData
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+    
     // Add debugging header to track requests
     config.headers['X-Debug-User-Role'] = localStorage.getItem('user') ? 
       JSON.parse(localStorage.getItem('user'))?.roles?.[0]?.name || 'unknown' : 'not-logged-in';
@@ -28,6 +35,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -42,14 +50,24 @@ api.interceptors.response.use(
     // Add specific error handling based on status codes
     if (error.response) {
       // Server returned an error response
+      console.error('Error status:', error.response.status);
+      console.error('Error data:', error.response.data);
+      
       if (error.response.status === 401) {
-        // Unauthorized - redirect to login
-        console.warn('Unauthorized access, redirecting to login');
-        // Don't redirect automatically in development
-        if (process.env.NODE_ENV === 'production') {
+        // Unauthorized - Only redirect if it's not a login/register request
+        if (!error.config.url.includes('/auth/login') && !error.config.url.includes('/auth/register')) {
+          console.warn('Unauthorized access, redirecting to login');
+          
+          // Clear user data
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          
+          // Only redirect in production
+          if (process.env.NODE_ENV === 'production') {
+            window.location.href = '/login';
+          }
+        } else {
+          console.warn('Login/register request failed with 401');
         }
       }
       
@@ -60,9 +78,8 @@ api.interceptors.response.use(
         // Handle role-based errors specifically
         if (error.response.data && 
             (error.response.data.message?.includes('quyền') || 
-             error.response.data.exception?.includes('UnauthorizedException'))) {
+             error.response.data.message?.includes('Unauthorized'))) {
           console.error('Role/permission error:', error.response.data.message);
-          console.error('Debug info:', error.response.data.debug_info || 'No debug info available');
           
           // Add more detailed debugging for role errors
           const userData = localStorage.getItem('user');
@@ -102,21 +119,68 @@ api.interceptors.response.use(
  */
 export const getCsrfToken = async () => {
   try {
-    // Check if we're in development mode and API is on localhost
-    if (process.env.NODE_ENV === 'development' && baseURL.includes('localhost')) {
-      await axios.get(`${baseURL}sanctum/csrf-cookie`, { withCredentials: true });
-    } else {
-      // In production, ensure the CSRF token is properly set
-      await axios.get(`${baseURL}sanctum/csrf-cookie`, { withCredentials: true });
+    // Extract base URL without trailing slash and /api prefix
+    let serverUrl = baseURL;
+    
+    // Remove /api/ from the URL if present
+    if (serverUrl.includes('/api/')) {
+      serverUrl = serverUrl.substring(0, serverUrl.indexOf('/api/'));
     }
+    
+    // Remove trailing slash if present
+    if (serverUrl.endsWith('/')) {
+      serverUrl = serverUrl.slice(0, -1);
+    }
+    
+    // Full URL for CSRF cookie endpoint
+    const csrfUrl = `${serverUrl}/sanctum/csrf-cookie`;
+    
+    console.log('Getting CSRF token from:', csrfUrl);
+    
+    // Use axios directly instead of api instance to avoid adding /api/ prefix
+    const response = await axios.get(csrfUrl, { 
+      withCredentials: true,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      timeout: 15000 // 15 second timeout
+    });
+    
+    console.log('CSRF token response:', response.status);
+    return true;
   } catch (error) {
     console.error('Failed to get CSRF token:', error);
+    console.error('Error details:', error.response?.data || error.message);
     
-    // In development, we might want to continue without the CSRF token
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Continuing without CSRF token in development mode');
-    } else {
-      throw error;
+    // Try alternative URL with /api/ prefix
+    try {
+      console.log('Trying alternative CSRF token URL');
+      const altCsrfUrl = `${baseURL}sanctum/csrf-cookie`;
+      
+      const response = await axios.get(altCsrfUrl, { 
+        withCredentials: true,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        timeout: 10000
+      });
+      
+      console.log('Alternative CSRF token response:', response.status);
+      return true;
+    } catch (altError) {
+      console.error('Failed to get CSRF token from alternative URL:', altError);
+      
+      // In development, we might want to continue without the CSRF token
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Continuing without CSRF token in development mode');
+        return false;
+      } else {
+        throw error;
+      }
     }
   }
 };
@@ -127,97 +191,118 @@ export const checkApiAvailability = async (retries = 3, delay = 1000) => {
     try {
       const response = await axios.get(`${baseURL}health-check`, { 
         timeout: 2000,
-        withCredentials: true 
+        withCredentials: true
       });
-      return response.status === 200;
-    } catch (error) {
-      console.warn(`API connectivity check failed (attempt ${attempt + 1}/${retries}):`, error.message);
       
-      // Last attempt failed
-      if (attempt === retries - 1) {
-        return false;
+      if (response.status === 200) {
+        console.log('API is available:', response.data);
+        return true;
       }
+    } catch (error) {
+      console.warn(`API check attempt ${attempt + 1} failed:`, error.message);
       
-      // Wait with exponential backoff before retry
-      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
+      if (attempt < retries - 1) {
+        const backoffDelay = delay * Math.pow(2, attempt);
+        console.log(`Retrying in ${backoffDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      }
     }
   }
+  
+  console.error(`API unavailable after ${retries} attempts`);
   return false;
 };
 
-/**
- * Make an API request with retry logic
- */
-export const apiRequestWithRetry = async (method, endpoint, data = null, config = {}, retries = 2) => {
+// Helper function to handle file downloads
+export const downloadFile = async (url, filename) => {
   try {
-    // Ensure endpoint has leading slash if it doesn't start with http
-    if (!endpoint.startsWith('http') && !endpoint.startsWith('/')) {
-      endpoint = '/' + endpoint;
-    }
+    const response = await api.get(url, {
+      responseType: 'blob',
+    });
     
-    // Remove duplicate api prefix if present in the endpoint
-    if (endpoint.includes('/api/api/')) {
-      endpoint = endpoint.replace('/api/api/', '/api/');
-    }
+    // Create a blob URL for the file
+    const blob = new Blob([response.data]);
+    const blobUrl = window.URL.createObjectURL(blob);
     
-    // Full URL for debugging
-    const fullUrl = endpoint.startsWith('http')
-      ? endpoint
-      : `${baseURL}${endpoint.replace(/^\/api\//, '')}`;
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
     
-    console.debug(`API ${method.toUpperCase()} request to: ${fullUrl}`);
+    // Clean up
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
     
-    const { headers, params } = config;
-    
-    // Ensure we don't send problematic parameters
-    if (params) {
-      if (params.active !== undefined) delete params.active;
-      if (params.is_active !== undefined) delete params.is_active;
-    }
-    
-    for (let attempt = 0; attempt < retries + 1; attempt++) {
-      try {
-        let response;
-        
-        switch (method.toLowerCase()) {
-          case 'get':
-            response = await api.get(fullUrl, { headers, params });
-            break;
-          case 'post':
-            response = await api.post(fullUrl, data, { headers });
-            break;
-          case 'put':
-            response = await api.put(fullUrl, data, { headers });
-            break;
-          case 'delete':
-            response = await api.delete(fullUrl, { headers, data });
-            break;
-          default:
-            throw new Error(`Unsupported method: ${method}`);
-        }
-        
-        return response;
-      } catch (error) {
-        console.warn(`API request failed (attempt ${attempt + 1}/${retries + 1}):`, error.message);
-        
-        // Don't retry 4xx client errors except 429 (rate limiting)
-        if (error.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 429) {
-          throw error;
-        }
-        
-        // Last attempt failed
-        if (attempt === retries) {
-          throw error;
-        }
-        
-        // Wait before retry with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-      }
-    }
+    return true;
   } catch (error) {
-    console.error('API request with retry failed:', error);
+    console.error('Download error:', error);
     throw error;
   }
+};
+
+/**
+ * Make API requests with automatic retry functionality
+ * @param {string} method - HTTP method (get, post, put, delete)
+ * @param {string} url - API endpoint URL
+ * @param {object} data - Request data (optional)
+ * @param {object} options - Additional axios options (optional)
+ * @param {number} retries - Number of retry attempts (default: 3)
+ * @param {number} delay - Initial delay between retries in ms (default: 1000)
+ * @returns {Promise<any>} API response
+ */
+export const apiRequestWithRetry = async (method, url, data = null, options = {}, retries = 3, delay = 1000) => {
+  let lastError;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      let response;
+      const config = { ...options };
+      
+      // Make the appropriate API call based on method
+      switch (method.toLowerCase()) {
+        case 'get':
+          response = await api.get(url, config);
+          break;
+        case 'post':
+          response = await api.post(url, data, config);
+          break;
+        case 'put':
+          response = await api.put(url, data, config);
+          break;
+        case 'delete':
+          response = await api.delete(url, { ...config, data });
+          break;
+        case 'patch':
+          response = await api.patch(url, data, config);
+          break;
+        default:
+          throw new Error(`Invalid method: ${method}`);
+      }
+      
+      return response;
+    } catch (error) {
+      console.warn(`Request attempt ${attempt + 1} failed for ${url}:`, error.message);
+      lastError = error;
+      
+      // Don't retry if it's a client error (4xx) except for 429 (too many requests)
+      if (error.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 429) {
+        throw error;
+      }
+      
+      // Don't retry on the last attempt
+      if (attempt < retries - 1) {
+        const backoffDelay = delay * Math.pow(2, attempt);
+        console.log(`Retrying in ${backoffDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      }
+    }
+  }
+  
+  // If we get here, all retry attempts have failed
+  console.error(`Request failed after ${retries} attempts:`, url);
+  throw lastError;
 };
 
 export default api;

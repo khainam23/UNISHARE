@@ -1,6 +1,17 @@
 import api, { getCsrfToken } from './api';
 import passwordService from './passwordService';
 
+// Cache mechanism for user data
+let userDataCache = {
+  data: null,
+  timestamp: 0,
+  loading: false,
+  pendingPromise: null
+};
+
+// Cache expiration time (5 minutes)
+const CACHE_EXPIRATION = 5 * 60 * 1000;
+
 const authService = {
   // Register a new user
   register: async (userData) => {
@@ -12,6 +23,10 @@ const authService = {
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Update cache
+        userDataCache.data = response.data.user;
+        userDataCache.timestamp = Date.now();
       }
       return response.data;
     } catch (error) {
@@ -25,16 +40,67 @@ const authService = {
       // Get CSRF token before making the request
       await getCsrfToken();
       
-      const response = await api.post('/auth/login', credentials);
-      if (response.data.token) {
+      console.log('Attempting login with credentials:', {
+        email: credentials.email,
+        password: credentials.password ? '[REDACTED]' : 'missing'
+      });
+      
+      // Add explicit headers for the login request and ensure correct format
+      const loginData = {
+        email: credentials.email.trim(),
+        password: credentials.password,
+      };
+      
+      const response = await api.post('/auth/login', loginData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        withCredentials: true
+      });
+      
+      console.log('Login response status:', response.status);
+      console.log('Login response data type:', typeof response.data);
+      console.log('Login token received:', response.data && response.data.token ? 'yes' : 'no');
+      
+      if (response.data && response.data.token) {
         // Make sure we're storing the complete user object with roles
         const user = response.data.user;
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(user));
+        
+        // Update cache
+        userDataCache.data = user;
+        userDataCache.timestamp = Date.now();
+        
+        // Set authorization header for subsequent requests
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
+        return response.data;
+      } else {
+        console.error('Login response missing token:', response.data);
+        throw new Error('Invalid login response - missing token');
       }
-      return response.data;
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      console.error('Login error:', error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+        
+        // Return a user-friendly error message
+        if (error.response.status === 401) {
+          throw { message: 'Email hoặc mật khẩu không chính xác' };
+        } else if (error.response.status === 422) {
+          throw { message: 'Vui lòng nhập đúng định dạng email và mật khẩu' };
+        } else if (error.response.status === 429) {
+          throw { message: 'Quá nhiều lần thử đăng nhập. Vui lòng thử lại sau ít phút.' };
+        }
+      }
+      
+      throw error.response?.data || { message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.' };
     }
   },
 
@@ -47,32 +113,140 @@ const authService = {
       await api.post('/auth/logout');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      
+      // Clear cache
+      userDataCache = {
+        data: null,
+        timestamp: 0,
+        loading: false,
+        pendingPromise: null
+      };
     } catch (error) {
       console.error('Logout error:', error);
       // Still remove local storage items even if API call fails
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      
+      // Clear cache
+      userDataCache = {
+        data: null,
+        timestamp: 0,
+        loading: false,
+        pendingPromise: null
+      };
     }
   },
-
+  
   // Get current user info with additional activity data
-  getCurrentUser: async () => {
+  getCurrentUser: async (forceRefresh = false) => {
+    // If we already have a request in progress, return that promise
+    if (userDataCache.loading && userDataCache.pendingPromise) {
+      console.log('getCurrentUser: Returning pending promise for in-progress request');
+      return userDataCache.pendingPromise;
+    }
+    
+    // Check if we have cached data that's still valid
+    const now = Date.now();
+    if (!forceRefresh && 
+        userDataCache.data && 
+        (now - userDataCache.timestamp < CACHE_EXPIRATION)) {
+      console.log('getCurrentUser: Using cached user data');
+      return userDataCache.data;
+    }
+    
+    // If we need to fetch fresh data
     try {
-      const response = await api.get('/auth/user');
-      // Update stored user data with fresh data
-      if (response.data.user) {
-        // Ensure we have the avatar_url property in the stored user data
-        const userData = {
-          ...response.data.user,
-          activity: response.data.activity || {}
-        };
-        
-        localStorage.setItem('user', JSON.stringify(userData));
-        return userData;
-      }
-      return response.data.user;
+      console.log('getCurrentUser: Fetching fresh user data from API');
+      userDataCache.loading = true;
+      
+      // Create a new promise for this request
+      userDataCache.pendingPromise = (async () => {
+        try {
+          // First, try to get CSRF token to ensure cookies are set
+          try {
+            await getCsrfToken();
+          } catch (csrfError) {
+            console.warn('CSRF token fetch failed, continuing anyway:', csrfError);
+          }
+          
+          // Add retry logic for better reliability
+          let retries = 3;
+          let lastError = null;
+          
+          for (let attempt = 0; attempt < retries; attempt++) {
+            try {
+              const response = await api.get('/auth/user', {
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache',
+                  'Expires': '0'
+                }
+              });
+              
+              // Update stored user data with fresh data
+              if (response.data && response.data.user) {
+                console.log('User data received successfully');
+                
+                // Ensure we have the avatar_url property in the stored user data
+                const userData = {
+                  ...response.data.user,
+                  activity: response.data.activity || {}
+                };
+                
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                // Update cache
+                userDataCache.data = userData;
+                userDataCache.timestamp = Date.now();
+                
+                return userData;
+              } else {
+                console.warn('User data response format unexpected:', response.data);
+                return response.data?.user || null;
+              }
+            } catch (err) {
+              console.warn(`Attempt ${attempt + 1} failed:`, err);
+              lastError = err;
+              
+              // Wait before retrying
+              if (attempt < retries - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+              }
+            }
+          }
+          
+          // If we've exhausted all retries, throw the last error
+          console.error('All attempts to get user data failed');
+          throw lastError;
+        } catch (error) {
+          console.error('Final getCurrentUser error:', error);
+          
+          // Return local data as fallback
+          const localUserData = localStorage.getItem('user');
+          if (localUserData) {
+            try {
+              const parsedUser = JSON.parse(localUserData);
+              // Update cache with local data
+              userDataCache.data = parsedUser;
+              userDataCache.timestamp = Date.now();
+              return parsedUser;
+            } catch (e) {
+              console.error('Error parsing local user data:', e);
+            }
+          }
+          
+          throw error.response ? error.response.data : error;
+        } finally {
+          userDataCache.loading = false;
+          userDataCache.pendingPromise = null;
+        }
+      })();
+      
+      return await userDataCache.pendingPromise;
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      userDataCache.loading = false;
+      userDataCache.pendingPromise = null;
+      throw error;
     }
   },
 
@@ -81,10 +255,29 @@ const authService = {
     return !!localStorage.getItem('token');
   },
 
-  // Get user from local storage
+  // Get user from local storage or cache
   getUser: () => {
+    // First check cache
+    if (userDataCache.data) {
+      return userDataCache.data;
+    }
+    
+    // Then check localStorage
     const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    if (user) {
+      try {
+        const parsedUser = JSON.parse(user);
+        // Update cache
+        userDataCache.data = parsedUser;
+        userDataCache.timestamp = Date.now();
+        return parsedUser;
+      } catch (e) {
+        console.error('Error parsing user data from localStorage:', e);
+        return null;
+      }
+    }
+    
+    return null;
   },
 
   // Refresh the user's role information
@@ -94,7 +287,8 @@ const authService = {
     }
     
     try {
-      const userData = await authService.getCurrentUser();
+      // Force refresh from API
+      const userData = await authService.getCurrentUser(true);
       return userData;
     } catch (error) {
       console.error('Failed to refresh user info:', error);
@@ -109,6 +303,16 @@ const authService = {
   
   resetPassword: async (data) => {
     return passwordService.resetPassword(data);
+  },
+  
+  // Invalidate cache (useful after profile updates)
+  invalidateCache: () => {
+    userDataCache = {
+      data: null,
+      timestamp: 0,
+      loading: false,
+      pendingPromise: null
+    };
   }
 };
 

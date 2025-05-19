@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Spinner } from 'react-bootstrap';
+import React, { useEffect, useState, createContext } from 'react';
+import { Container, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -13,28 +13,68 @@ import ParticipationHistory from '../components/profile/ParticipationHistory';
 import CurrentGroups from '../components/profile/CurrentGroups';
 import { authService } from '../services';
 
+// Create a context to share user data with child components
+export const ProfileContext = createContext({
+  userData: null,
+  loading: true,
+  error: null,
+  refreshUserData: () => {}
+});
+
 const ProfilePage = () => {
   const { section } = useParams();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
 
+  // Function to refresh user data - can be called by child components
+  const refreshUserData = async (forceRefresh = false) => {
+    try {
+      setError(null);
+      
+      // Get user data from cache or API
+      const data = await authService.getCurrentUser(forceRefresh);
+      setUserData(data);
+      return data;
+    } catch (refreshError) {
+      console.error("ProfilePage: Error refreshing user data:", refreshError);
+      setError("Không thể kết nối đến máy chủ để cập nhật thông tin. Đang hiển thị dữ liệu đã lưu.");
+      
+      // Try to get from local storage as fallback
+      const localData = authService.getUser();
+      if (localData) {
+        setUserData(localData);
+        return localData;
+      }
+      return null;
+    }
+  };
+
   useEffect(() => {
-    // Check if user is logged in
+    // Check if user is logged in and load data
     const checkAuth = async () => {
       try {
         setLoading(true);
+        setError(null);
+        console.log('ProfilePage: Checking authentication status');
+        
         const isLoggedIn = authService.isLoggedIn();
+        console.log('ProfilePage: User logged in status:', isLoggedIn);
         
         if (!isLoggedIn) {
+          console.log('ProfilePage: User not logged in, redirecting to login page');
           navigate('/login');
           return;
         }
         
-        // Optionally refresh user data
-        await authService.getCurrentUser();
+        // Load user data - this will use cache if available
+        await refreshUserData();
       } catch (error) {
-        console.error("Authentication error:", error);
-        navigate('/login');
+        console.error("ProfilePage: Authentication error:", error);
+        setError("Lỗi xác thực. Vui lòng đăng nhập lại.");
+        // Navigate after a short delay to allow error to be displayed
+        setTimeout(() => navigate('/login'), 2000);
       } finally {
         setLoading(false);
       }
@@ -87,6 +127,14 @@ const ProfilePage = () => {
       );
   }
 
+  // Context value to be provided to all child components
+  const contextValue = {
+    userData,
+    loading,
+    error,
+    refreshUserData
+  };
+
   if (loading) {
     return (
       <>
@@ -105,10 +153,15 @@ const ProfilePage = () => {
   }
 
   return (
-    <>
+    <ProfileContext.Provider value={contextValue}>
       <Header />
       <div className="profile-page-wrapper" style={{ backgroundColor: '#e9f5ff', paddingTop: '2rem', paddingBottom: '2rem' }}>
         <Container>
+          {error && (
+            <Alert variant="warning" className="mb-4">
+              {error}
+            </Alert>
+          )}
           <Row>
             {/* Sidebar */}
             <Col md={3}>
@@ -130,7 +183,7 @@ const ProfilePage = () => {
         </Container>
       </div>
       <Footer />
-    </>
+    </ProfileContext.Provider>
   );
 };
 

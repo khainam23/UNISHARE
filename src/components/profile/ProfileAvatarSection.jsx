@@ -1,20 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useContext } from 'react';
 import { Card, Image, Button, Form, Alert, Spinner } from 'react-bootstrap';
 import { profileService, authService } from '../../services';
 import userDefaultAvatar from '../../assets/avatar-1.png';
+import { ProfileContext } from '../../pages/ProfilePage';
 
 const ProfileAvatarSection = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // Use the shared context instead of making separate API calls
+  const { userData: user, refreshUserData, loading } = useContext(ProfileContext);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    const userData = authService.getUser();
-    setUser(userData);
-  }, []);
 
   const handleAvatarClick = () => {
     fileInputRef.current.click();
@@ -45,10 +41,11 @@ const ProfileAvatarSection = () => {
 
       const response = await profileService.uploadAvatar(file);
       
-      // Update local user data
-      const updatedUser = { ...user, avatar: response.avatar };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      // Invalidate the cache to force a refresh
+      authService.invalidateCache();
+      
+      // Refresh user data in the context
+      await refreshUserData(true);
       
       setSuccess('Cập nhật ảnh đại diện thành công');
       

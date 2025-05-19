@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Form, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { profileService, authService } from '../../services';
+import { ProfileContext } from '../../pages/ProfilePage';
 
 const EditProfileInfoForm = () => {
+  const { userData, loading: contextLoading, refreshUserData } = useContext(ProfileContext);
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -13,7 +16,7 @@ const EditProfileInfoForm = () => {
     student_id: '',
     bio: ''
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState('');
@@ -21,47 +24,19 @@ const EditProfileInfoForm = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setLoading(true);
-        // Get user data from local storage first
-        let userData = authService.getUser();
-        
-        if (userData) {
-          setFormData({
-            name: userData.name || '',
-            phone: userData.phone || '',
-            email: userData.email || '',
-            university: userData.university || '',
-            department: userData.department || '',
-            student_id: userData.student_id || '',
-            bio: userData.bio || ''
-          });
-        }
-        
-        // Then get fresh data from the API
-        const freshUser = await authService.getCurrentUser();
-        if (freshUser) {
-          setFormData({
-            name: freshUser.name || '',
-            phone: freshUser.phone || '',
-            email: freshUser.email || '',
-            university: freshUser.university || '',
-            department: freshUser.department || '',
-            student_id: freshUser.student_id || '',
-            bio: freshUser.bio || ''
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-        setGeneralError('Không thể tải thông tin hồ sơ. Vui lòng thử lại sau.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, []);
+    // Use the user data from context
+    if (userData) {
+      setFormData({
+        name: userData.name || '',
+        phone: userData.phone || '',
+        email: userData.email || '',
+        university: userData.university || '',
+        department: userData.department || '',
+        student_id: userData.student_id || '',
+        bio: userData.bio || ''
+      });
+    }
+  }, [userData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -115,15 +90,13 @@ const EditProfileInfoForm = () => {
       const response = await profileService.updateProfile(formData);
       
       if (response.success) {
-        // Update local storage with new user data
-        const currentUser = authService.getUser();
-        const updatedUser = { ...currentUser, ...formData };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+        // Invalidate the cache
+        authService.invalidateCache();
+        
+        // Refresh user data using the context function
+        await refreshUserData(true);
         
         setSuccess('Thông tin hồ sơ đã được cập nhật thành công');
-        
-        // Refresh user data in storage
-        await authService.getCurrentUser();
         
         // Redirect after successful update
         setTimeout(() => {
@@ -145,7 +118,7 @@ const EditProfileInfoForm = () => {
     }
   };
 
-  if (loading) {
+  if (contextLoading || loading) {
     return <div className="text-center py-4"><Spinner animation="border" /></div>;
   }
 

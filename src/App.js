@@ -12,6 +12,8 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
 import DocumentView from './pages/DocumentView';
 import EditDocument from './pages/EditDocument';
+import GroupDetailPage from './pages/GroupDetailPage';
+import ChatPage from './pages/ChatPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
@@ -128,8 +130,17 @@ function App() {
           } />
           
           {/* General unishare routes for groups/courses */}
-          <Route path="/unishare" element={<UniSharePage />} />
-          <Route path="/unishare/:section" element={<UniSharePage />} />
+          <Route path="/unishare" element={<UniSharePage />} />          <Route path="/unishare/:section" element={<UniSharePage />} />
+          <Route path="/unishare/groups/:groupId" element={
+            <ProtectedRoute>
+              <GroupDetailPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/unishare/chats/:chatId" element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } />
           
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

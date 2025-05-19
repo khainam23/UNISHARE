@@ -21,21 +21,35 @@ const LoginForm = () => {
       [name]: value,
     });
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    // Validate input
+    if (!credentials.email || !credentials.password) {
+      setError('Vui lòng nhập cả email và mật khẩu');
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('Attempting login...');
       const response = await authService.login(credentials);
+      
+      if (!response || !response.user) {
+        throw new Error('Đăng nhập không thành công. Dữ liệu người dùng không hợp lệ.');
+      }
+      
       const user = response.user;
+      console.log('Login successful!');
       
       // Dispatch custom event for Header to detect login
       window.dispatchEvent(new Event('storage'));
       
       // Determine redirect path based on user role
       const redirectPath = getRedirectPathForUser(user);
+      console.log(`Redirecting to: ${redirectPath}`);
       
       // Log the redirect for admin users
       if (isAdmin(user)) {
@@ -45,10 +59,19 @@ const LoginForm = () => {
       // Redirect to appropriate page
       navigate(redirectPath);
     } catch (err) {
-      setError(
-        err.message || 
-        'Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu.'
-      );
+      console.error('Login error:', err);
+      
+      // Handle different types of errors
+      if (err.errors && err.errors.email) {
+        setError(err.errors.email[0]);
+      } else if (err.errors && err.errors.password) {
+        setError(err.errors.password[0]);
+      } else {
+        setError(
+          err.message || 
+          'Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu.'
+        );
+      }
     } finally {
       setLoading(false);
     }

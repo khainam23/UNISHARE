@@ -229,13 +229,249 @@ const profileService = {
    * Leave a group
    * @param {Number} groupId - The ID of the group to leave
    * @returns {Promise} Promise with success message
-   */
-  leaveGroup: async (groupId) => {
+   */  leaveGroup: async (groupId) => {
     try {
-      const response = await api.post(`/groups/${groupId}/leave`);
+      // Make sure the token is in the request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return { success: false, message: 'Authentication token not found' };
+      }
+      
+      console.log(`Attempting to leave group ${groupId} with token: ${token.substring(0, 15)}...`);
+      
+      // FIX: Thêm timeout dài hơn và retry logic cho API rời nhóm
+      const response = await api.post(`/groups/${groupId}/leave`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        timeout: 10000 // Tăng timeout lên 10 giây
+      });
+      
+      console.log('Leave group response:', response.data);
+      
+      // Đảm bảo chúng ta kiểm tra phản hồi chính xác
+      if (response.data && response.data.success === true) {
+        return response.data;
+      } else {
+        // Trả về lỗi nếu phản hồi không có success = true
+        return {
+          success: false,
+          message: response.data?.message || 'Unexpected response when leaving group'
+        };
+      }
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      
+      // Provide more detailed error info for debugging
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+        return { 
+          success: false, 
+          message: error.response.data?.message || 'Failed to leave group',
+          error: error.response.data
+        };
+      }
+      
+      return {
+        success: false,
+        message: error.message || 'Network error when trying to leave group'
+      };
+    }
+  },
+  
+  /**
+   * Get group details
+   * @param {Number} groupId - The ID of the group
+   * @returns {Promise} Promise with group details
+   */
+  getGroupDetails: async (groupId) => {
+    try {
+      const response = await api.get(`/user/groups/${groupId}`);
       return response.data;
     } catch (error) {
       throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Join a group
+   * @param {Number} groupId - The ID of the group to join
+   * @returns {Promise} Promise with success message
+   */
+  joinGroup: async (groupId) => {
+    try {
+      const response = await api.post(`/groups/${groupId}/join`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Get group members
+   * @param {Number} groupId - The ID of the group
+   * @param {Object} params - Query parameters like page, limit, etc.
+   * @returns {Promise} Promise with group members
+   */
+  getGroupMembers: async (groupId, params = {}) => {
+    try {
+      const response = await api.get(`/groups/${groupId}/members`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Create a new group
+   * @param {Object} groupData - Group data including name, description, etc.
+   * @returns {Promise} Promise with created group data
+   */
+  createGroup: async (groupData) => {
+    try {
+      // Handle FormData for file uploads
+      let config = {};
+      if (groupData instanceof FormData) {
+        config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        };
+      }
+      
+      const response = await api.post('/groups', groupData, config);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Update a group
+   * @param {Number} groupId - The ID of the group to update
+   * @param {Object} groupData - Updated group data
+   * @returns {Promise} Promise with updated group data
+   */
+  updateGroup: async (groupId, groupData) => {
+    try {
+      // Handle FormData for file uploads
+      let config = {};
+      if (groupData instanceof FormData) {
+        config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        };
+      }
+      
+      const response = await api.put(`/groups/${groupId}`, groupData, config);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Get pending group join requests
+   * @param {Number} groupId - The ID of the group
+   * @returns {Promise} Promise with join requests
+   */
+  getGroupJoinRequests: async (groupId) => {
+    try {
+      const response = await api.get(`/groups/${groupId}/join-requests`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Approve a group join request
+   * @param {Number} groupId - The ID of the group
+   * @param {Number} userId - The ID of the user
+   * @returns {Promise} Promise with success message
+   */
+  approveJoinRequest: async (groupId, userId) => {
+    try {
+      const response = await api.post(`/groups/${groupId}/join-requests/${userId}/approve`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Reject a group join request
+   * @param {Number} groupId - The ID of the group
+   * @param {Number} userId - The ID of the user
+   * @returns {Promise} Promise with success message
+   */
+  rejectJoinRequest: async (groupId, userId) => {
+    try {
+      const response = await api.post(`/groups/${groupId}/join-requests/${userId}/reject`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Change a member's role in a group
+   * @param {Number} groupId - The ID of the group
+   * @param {Number} userId - The ID of the user
+   * @param {String} role - The new role (admin, moderator, member)
+   * @returns {Promise} Promise with success message
+   */
+  changeGroupMemberRole: async (groupId, userId, role) => {
+    try {
+      const response = await api.put(`/groups/${groupId}/members/${userId}`, { role });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+  
+  /**
+   * Remove a member from a group
+   * @param {Number} groupId - The ID of the group
+   * @param {Number} userId - The ID of the user to remove
+   * @returns {Promise} Promise with success message
+   */
+  removeGroupMember: async (groupId, userId) => {
+    try {
+      const response = await api.delete(`/groups/${groupId}/members/${userId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get posts for a specific group
+   * @param {Number} groupId - The ID of the group
+   * @param {Object} params - Query parameters like page, limit, etc.
+   * @returns {Promise} Promise with group posts
+   */
+  getGroupPosts: async (groupId, params = {}) => {
+    try {
+      const response = await api.get(`/groups/${groupId}/posts`, { params });
+      return {
+        success: true,
+        data: response.data.data || [],
+        meta: response.data.meta || { current_page: 1, last_page: 1, total: 0 }
+      };
+    } catch (error) {
+      console.error('Error fetching group posts:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Could not fetch group posts',
+        data: [],
+        meta: { current_page: 1, last_page: 1, total: 0 }
+      };
     }
   },
 

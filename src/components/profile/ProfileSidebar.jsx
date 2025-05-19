@@ -1,54 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { Nav, Image, Spinner } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 import {
   BsPersonCircle, BsPencilSquare, BsKey, BsFileEarmarkText, BsClockHistory,
   BsPeople, BsBook, BsGear, BsShieldCheck
 } from 'react-icons/bs';
-import { authService } from '../../services';
 import defaultAvatar from '../../assets/avatar-1.png';
+import { ProfileContext } from '../../pages/ProfilePage';
 
 const ProfileSidebar = ({ activeSection }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setLoading(true);
-        // First get from local storage
-        let userData = authService.getUser();
-        if (userData) {
-          setUser(userData);
-        }
-
-        // Then refresh from API
-        const freshUser = await authService.getCurrentUser();
-        if (freshUser) {
-          setUser(freshUser);
-        }
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-
-    // Listen for storage updates (e.g. avatar changes)
-    const handleStorageChange = () => {
-      const updatedUser = authService.getUser();
-      if (updatedUser) {
-        setUser(updatedUser);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+  const { userData: user, loading } = useContext(ProfileContext);
 
   const sidebarNavItems = [
     {
