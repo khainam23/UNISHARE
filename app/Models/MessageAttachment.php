@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class MessageAttachment extends Model
+{
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'message_id',
+        'file_name',
+        'file_path',
+        'file_size',
+        'file_type',
+    ];
+
+    /**
+     * Get the message that owns the attachment.
+     */
+    public function message()
+    {
+        return $this->belongsTo(Message::class);
+    }
+}
