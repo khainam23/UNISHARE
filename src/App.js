@@ -10,6 +10,8 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
+import DocumentView from './pages/DocumentView';
+import EditDocument from './pages/EditDocument';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
@@ -110,6 +112,18 @@ function App() {
           <Route path="/unishare-files/trash" element={
             <ProtectedRoute>
               <UniShareUpload activeSection="trash" />
+            </ProtectedRoute>
+          } />
+          
+          {/* New routes for document viewing and editing */}
+          <Route path="/unishare-files/view/:id" element={
+            <ProtectedRoute>
+              <DocumentView />
+            </ProtectedRoute>
+          } />
+          <Route path="/unishare-files/edit/:id" element={
+            <ProtectedRoute>
+              <EditDocument />
             </ProtectedRoute>
           } />
           

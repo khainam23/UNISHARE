@@ -1,19 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  FaHome, 
-  FaChartBar,
-  FaEnvelope,
-  FaUserShield,
-  FaUsers,
-  FaUserGraduate,
-  FaUserFriends,
-  FaCog,
-  FaWallet,
-  FaQuestionCircle,
-  FaKey
-} from 'react-icons/fa';
-import uniShareLogo from '../../assets/unishare-logo.png';
+import { FaHome, FaChartBar, FaBook, FaUsers, FaUserFriends, FaEnvelope, 
+         FaComments, FaUserShield, FaClipboardList, FaKey, FaFileAlt, 
+         FaCog, FaWallet, FaQuestionCircle } from 'react-icons/fa';
 
 const NavItem = ({ icon: Icon, text, link, active }) => (
   <Link
@@ -37,14 +26,19 @@ const Sidebar = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  // Group menu items based on functionality areas from the permission structure
   const menuItems = [
     { icon: FaHome, text: 'Trang Chủ', link: '/admin/home', active: currentPath === '/admin/home' },
     { icon: FaChartBar, text: 'Dashboard', link: '/admin/dashboard', active: currentPath === '/admin/dashboard' },
-    { icon: FaEnvelope, text: 'Tin Nhắn', link: '/admin/messages', active: currentPath === '/admin/messages' },
-    { icon: FaUserShield, text: 'Quản Lý Báo Cáo', link: '/admin/reports', active: currentPath === '/admin/reports' },
+    { icon: FaBook, text: 'Quản Lý Tài Liệu', link: '/admin/documents', active: currentPath.includes('/admin/documents') },
     { icon: FaUsers, text: 'Quản Lý Người Dùng', link: '/admin/users', active: currentPath === '/admin/users' },
-    { icon: FaUserGraduate, text: 'Quản Lý Nhóm Học', link: '/admin/study-groups', active: currentPath === '/admin/study-groups' },
+    { icon: FaUserFriends, text: 'Quản Lý Nhóm', link: '/admin/groups', active: currentPath.includes('/admin/groups') },
+    { icon: FaEnvelope, text: 'Tin Nhắn', link: '/admin/messages', active: currentPath === '/admin/messages' },
+    { icon: FaComments, text: 'Quản Lý Bình Luận', link: '/admin/comments', active: currentPath === '/admin/comments' },
+    { icon: FaUserShield, text: 'Quản Lý Báo Cáo', link: '/admin/reports', active: currentPath === '/admin/reports' },
+    { icon: FaClipboardList, text: 'Duyệt Nội Dung', link: '/admin/content-review', active: currentPath === '/admin/content-review' },
     { icon: FaKey, text: 'Quản Lý Phân Quyền', link: '/admin/permissions', active: currentPath === '/admin/permissions' },
+    { icon: FaFileAlt, text: 'Báo Cáo & Thống Kê', link: '/admin/statistics', active: currentPath === '/admin/statistics' },
   ];
 
   const otherItems = [
@@ -54,55 +48,33 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="sidebar" style={{ 
-      width: '280px',
-      backgroundColor: '#ffffff', 
-      height: '100vh',
-      borderRight: '1px solid #f0f0f0',
-      padding: '24px 16px'
-    }}>
-      <div className="d-flex align-items-center px-3 mb-4">
-        <img 
-          src={uniShareLogo} 
-          alt="UNISHARE" 
-          style={{ height: '32px' }}
-        />
-      </div>
-      
-      <div className="px-2 mb-4">
-        <small className="text-muted ps-2 mb-2 d-block" 
-               style={{fontSize: '12px'}}>
-          Menu
-        </small>
-        <div className="nav flex-column">
-          {menuItems.map((item, index) => (
-            <NavItem 
-              key={index}
-              icon={item.icon}
-              text={item.text}
-              link={item.link}
-              active={item.active}
-            />
-          ))}
-        </div>
+    <div className="admin-sidebar bg-white shadow-sm p-3 h-100">
+      <div className="sidebar-brand mb-4 py-2">
+        <h5 className="mb-0 fw-bold text-primary">UNISHARE ADMIN</h5>
       </div>
 
-      <div className="px-2">
-        <small className="text-muted ps-2 mb-2 d-block" 
-               style={{fontSize: '12px'}}>
-          Others
-        </small>
-        <div className="nav flex-column">
-          {otherItems.map((item, index) => (
-            <NavItem 
-              key={index}
-              icon={item.icon}
-              text={item.text}
-              link={item.link}
-              active={item.active}
-            />
-          ))}
-        </div>
+      <div className="sidebar-menu">
+        {menuItems.map((item, index) => (
+          <NavItem 
+            key={index}
+            icon={item.icon}
+            text={item.text}
+            link={item.link}
+            active={item.active}
+          />
+        ))}
+        
+        <div className="sidebar-divider my-3"></div>
+        
+        {otherItems.map((item, index) => (
+          <NavItem 
+            key={index}
+            icon={item.icon}
+            text={item.text}
+            link={item.link}
+            active={item.active}
+          />
+        ))}
       </div>
     </div>
   );

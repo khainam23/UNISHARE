@@ -1,18 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/admin/Layout';
 import Dashboard from '../components/admin/Dashboard';
 import { Container, Row, Col, Card, Button, Nav, Form, Spinner, Alert } from 'react-bootstrap';
 import DocumentPreview from '../components/admin/DocumentPreview';
-import { FaStar } from 'react-icons/fa';
+import StatisticsCards from '../components/admin/StatisticsCards';
+import UserManagement from '../components/admin/UserManagement';
+import PermissionsManager from '../components/admin/PermissionsManager';
+import TrafficChart from '../components/admin/TrafficChart';
+import OrderTimeCard from '../components/admin/OrderTimeCard';
+import OrderTrendCard from '../components/admin/OrderTrendCard';
+import UserRatingCard from '../components/admin/UserRatingCard';
+import FavoriteTeacherCard from '../components/admin/FavoriteTeacherCard';
+import DocumentsManagement from '../components/admin/DocumentsManagement';
+import GroupManagement from '../components/admin/GroupManagement';
 import { 
+  FaStar, 
   FaUsers, 
   FaBook, 
   FaFileAlt, 
-  FaShoppingCart,
-  FaEnvelope,
-  FaUserShield,
-  FaUserGraduate
+  FaShoppingCart 
 } from 'react-icons/fa';
 import reactIcon from '../assets/react-icon.png';
 import avatarPlaceholder from '../assets/avatar-1.png';
@@ -44,6 +51,16 @@ const AdminPage = () => {
   const [reports, setReports] = useState([]);
   const [teachers, setTeachers] = useState([]);
   
+  // Use refs to track if API calls are already in progress
+  const loadingRef = useRef({
+    dashboard: false,
+    users: false,
+    messages: false,
+    permissions: false,
+    reports: false,
+    teachers: false
+  });
+
   // Update activeTab when URL parameter changes
   useEffect(() => {
     if (tab) {
@@ -55,49 +72,53 @@ const AdminPage = () => {
 
   // Fetch dashboard stats when dashboard tab is active
   useEffect(() => {
-    if (activeTab === 'dashboard') {
+    if (activeTab === 'dashboard' && !loadingRef.current.dashboard) {
       fetchDashboardStats();
     }
   }, [activeTab]);
   
   // Fetch users when users tab is active
   useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'users' && !loadingRef.current.users) {
       fetchUsers();
     }
   }, [activeTab]);
   
   // Fetch messages when messages tab is active
   useEffect(() => {
-    if (activeTab === 'messages') {
+    if (activeTab === 'messages' && !loadingRef.current.messages) {
       fetchMessages();
     }
   }, [activeTab]);
   
   // Fetch permission users when permissions tab is active
   useEffect(() => {
-    if (activeTab === 'permissions') {
+    if (activeTab === 'permissions' && !loadingRef.current.permissions) {
       fetchPermissionUsers();
     }
-  }, [activeTab]);
+  }, [activeTab, permissionTab]);
   
   // Fetch reports when reports tab is active
   useEffect(() => {
-    if (activeTab === 'reports') {
+    if (activeTab === 'reports' && !loadingRef.current.reports) {
       fetchReports();
     }
   }, [activeTab]);
   
   // Fetch favorite teachers for dashboard
   useEffect(() => {
-    if (activeTab === 'dashboard') {
+    if (activeTab === 'dashboard' && !loadingRef.current.teachers) {
       fetchTeachers();
     }
   }, [activeTab]);
   
   // API fetch functions
   const fetchDashboardStats = async () => {
+    // Skip if already loading
+    if (loadingRef.current.dashboard || loading) return;
+    
     setLoading(true);
+    loadingRef.current.dashboard = true;
     setError('');
     
     try {
@@ -141,18 +162,22 @@ const AdminPage = () => {
       setError('Failed to load dashboard statistics. Please try again later.');
     } finally {
       setLoading(false);
+      loadingRef.current.dashboard = false;
     }
   };
   
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    if (loadingRef.current.users || loading) return;
+    
     setLoading(true);
+    loadingRef.current.users = true;
     setError('');
     
     try {
       const response = await adminService.getUsers();
       
       // Format users data for our component
-      const formattedUsers = response.data?.map(user => ({
+      const formattedUsers = response.data?.data?.map(user => ({
         id: user.id,
         name: user.name,
         role: user.roles?.[0]?.name === 'admin' ? 'Admin' : 
@@ -166,11 +191,15 @@ const AdminPage = () => {
       setError('Failed to load user data. Please try again later.');
     } finally {
       setLoading(false);
+      loadingRef.current.users = false;
     }
-  };
+  }, []);
   
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
+    if (loadingRef.current.messages || loading) return;
+    
     setLoading(true);
+    loadingRef.current.messages = true;
     setError('');
     
     try {
@@ -215,11 +244,15 @@ const AdminPage = () => {
       setError('Failed to load messages data. Please try again later.');
     } finally {
       setLoading(false);
+      loadingRef.current.messages = false;
     }
-  };
+  }, []);
   
-  const fetchPermissionUsers = async () => {
+  const fetchPermissionUsers = useCallback(async () => {
+    if (loadingRef.current.permissions || loading) return;
+    
     setLoading(true);
+    loadingRef.current.permissions = true;
     setError('');
     
     try {
@@ -227,7 +260,7 @@ const AdminPage = () => {
       const response = await adminService.getUsers({ role: rolesToFetch.join(',') });
       
       // Format users data for permissions tab
-      const formattedUsers = response.data?.map(user => ({
+      const formattedUsers = response.data?.data?.map(user => ({
         id: user.id,
         name: user.name,
         role: user.department || 'Không có thông tin',
@@ -241,11 +274,15 @@ const AdminPage = () => {
       setError('Failed to load user permissions data. Please try again later.');
     } finally {
       setLoading(false);
+      loadingRef.current.permissions = false;
     }
-  };
+  }, [permissionTab]);
   
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
+    if (loadingRef.current.reports || loading) return;
+    
     setLoading(true);
+    loadingRef.current.reports = true;
     setError('');
     
     try {
@@ -267,11 +304,15 @@ const AdminPage = () => {
       setError('Failed to load reports data. Please try again later.');
     } finally {
       setLoading(false);
+      loadingRef.current.reports = false;
     }
-  };
+  }, []);
   
-  const fetchTeachers = async () => {
+  const fetchTeachers = useCallback(async () => {
+    if (loadingRef.current.teachers || loading) return;
+    
     setLoading(true);
+    loadingRef.current.teachers = true;
     
     try {
       const response = await adminService.getTeachers({ sort: 'rating', limit: 4 });
@@ -306,8 +347,9 @@ const AdminPage = () => {
       ]);
     } finally {
       setLoading(false);
+      loadingRef.current.teachers = false;
     }
-  };
+  }, []);
 
   // Filter users based on permission tab
   const filteredPermissionUsers = permissionUsers.filter(user => user.type === permissionTab);
@@ -436,13 +478,6 @@ const AdminPage = () => {
     setActiveTab(tabName);
     navigate(`/admin/${tabName}`);
   };
-  
-  // Handle permission tab change
-  useEffect(() => {
-    if (activeTab === 'permissions') {
-      fetchPermissionUsers();
-    }
-  }, [permissionTab, activeTab]);
 
   // If showing document preview from Reports
   if (showDocumentPreview) {
@@ -606,6 +641,30 @@ const AdminPage = () => {
             Quản Lý Báo Cáo
           </Nav.Link>
         </Nav.Item>
+        <Nav.Item>
+          <Nav.Link 
+            className={activeTab === 'documents' ? 'active' : ''}
+            onClick={() => handleTabChange('documents')}
+            style={{ 
+              color: activeTab === 'documents' ? '#0370B7' : '#6c757d',
+              cursor: 'pointer'
+            }}
+          >
+            Quản Lý Tài Liệu
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link 
+            className={activeTab === 'groups' ? 'active' : ''}
+            onClick={() => handleTabChange('groups')}
+            style={{ 
+              color: activeTab === 'groups' ? '#0370B7' : '#6c757d',
+              cursor: 'pointer'
+            }}
+          >
+            Quản Lý Nhóm
+          </Nav.Link>
+        </Nav.Item>
       </Nav>
       
       {loading && (
@@ -624,261 +683,36 @@ const AdminPage = () => {
           <Dashboard />
           
           {/* Statistics Cards */}
-          <Row className="mb-4">
-            {stats.map((stat, index) => (
-              <Col md={3} sm={6} className="mb-3" key={index}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body className="d-flex align-items-center">
-                    <div
-                      style={{
-                        backgroundColor: stat.bgColor,
-                        color: stat.color,
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: '16px'
-                      }}
-                    >
-                      <stat.icon size={24} />
-                    </div>
-                    <div>
-                      <div className="text-muted" style={{ fontSize: '14px' }}>
-                        {stat.title}
-                      </div>
-                      <div style={{ fontSize: '22px', fontWeight: '600' }}>
-                        {stat.value}
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+          <StatisticsCards stats={stats} />
           
-          {/* Charts Section - Simple placeholders */}
+          {/* Charts Section */}
           <Row>
             <Col lg={8} className="mb-4">
-              <Card className="border-0 shadow-sm mb-4">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="card-title mb-0">Traffic</h5>
-                    <Button variant="outline-secondary" size="sm" style={{ fontSize: '12px' }}>View Report</Button>
-                  </div>
-                  <div className="text-center py-5 bg-light rounded">
-                    <p className="mb-0">Traffic chart will appear here after loading Chart.js</p>
-                    <small className="text-muted">You may need to install chart.js and react-chartjs-2</small>
-                  </div>
-                </Card.Body>
-              </Card>
+              <TrafficChart />
             </Col>
             <Col lg={4} className="mb-4">
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="card-title mb-0">Order Time</h5>
-                    <Button variant="outline-secondary" size="sm" style={{ fontSize: '12px' }}>View Report</Button>
-                  </div>
-                  <div className="text-center py-5 bg-light rounded">
-                    <p className="mb-0">Order time chart will appear here</p>
-                    <small className="text-muted">Doughnut chart loads after Chart.js</small>
-                  </div>
-                </Card.Body>
-              </Card>
+              <OrderTimeCard />
             </Col>
           </Row>
           
           {/* Bottom Charts & Tables */}
           <Row className="mb-4">
             <Col lg={4} className="mb-4 mb-lg-0">
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <h5 className="card-title mb-4">Your Rating</h5>
-                  <div className="text-center py-4">
-                    <div className="mb-3" style={{ fontSize: '24px', fontWeight: 'bold', color: '#FF8B00' }}>85%</div>
-                    <p className="mb-0">Your Average Rating</p>
-                  </div>
-                </Card.Body>
-              </Card>
+              <UserRatingCard />
             </Col>
             <Col lg={4} className="mb-4 mb-lg-0">
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <h5 className="card-title mb-4">Favorite Teacher</h5>
-                  {teachers.slice(0, 2).map((teacher) => (
-                    <div key={teacher.id} className="d-flex align-items-center mb-3">
-                      <img
-                        src={teacher.image}
-                        alt={teacher.name}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          marginRight: '12px'
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: '500', fontSize: '14px' }}>{teacher.name}</div>
-                        <div className="d-flex align-items-center">
-                          <FaStar style={{ color: '#FFC107', fontSize: '12px', marginRight: '4px' }} />
-                          <span style={{ fontSize: '12px', color: '#6C757D' }}>{teacher.rating}</span>
-                        </div>
-                      </div>
-                      <span className="badge rounded-pill bg-light text-dark" style={{ fontSize: '10px' }}>
-                        {teacher.id === 1 ? '5.0/5.0' : teacher.rating}
-                      </span>
-                    </div>
-                  ))}
-                </Card.Body>
-              </Card>
+              <FavoriteTeacherCard teachers={teachers} />
             </Col>
             <Col lg={4}>
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h5 className="card-title mb-0">Order</h5>
-                    <Button variant="outline-secondary" size="sm" style={{ fontSize: '12px' }}>View Report</Button>
-                  </div>
-                  <div className="text-center py-4 bg-light rounded">
-                    <p className="mb-0">Order trend chart will appear here</p>
-                    <small className="text-muted">Line chart loads after Chart.js</small>
-                  </div>
-                </Card.Body>
-              </Card>
+              <OrderTrendCard />
             </Col>
           </Row>
-          
-          {/* Latest Transactions Section */}
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h5 className="card-title mb-0">Latest Transactions</h5>
-                <Button variant="outline-primary" size="sm">View All</Button>
-              </div>
-              
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th scope="col" style={{fontSize: '14px'}}>Transaction ID</th>
-                      <th scope="col" style={{fontSize: '14px'}}>Customer</th>
-                      <th scope="col" style={{fontSize: '14px'}}>Date</th>
-                      <th scope="col" style={{fontSize: '14px'}}>Amount</th>
-                      <th scope="col" style={{fontSize: '14px'}}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>#TRN-0123</td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div style={{width: '32px', height: '32px', borderRadius: '50%', background: '#f0f0f0', marginRight: '8px'}}></div>
-                          <span>Nguyễn Văn A</span>
-                        </div>
-                      </td>
-                      <td>25 Jun 2023</td>
-                      <td>250.000đ</td>
-                      <td><span className="badge bg-success">Completed</span></td>
-                    </tr>
-                    <tr>
-                      <td>#TRN-0124</td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div style={{width: '32px', height: '32px', borderRadius: '50%', background: '#f0f0f0', marginRight: '8px'}}></div>
-                          <span>Trần Thị B</span>
-                        </div>
-                      </td>
-                      <td>25 Jun 2023</td>
-                      <td>120.000đ</td>
-                      <td><span className="badge bg-warning text-dark">Pending</span></td>
-                    </tr>
-                    <tr>
-                      <td>#TRN-0125</td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div style={{width: '32px', height: '32px', borderRadius: '50%', background: '#f0f0f0', marginRight: '8px'}}></div>
-                          <span>Lê Văn C</span>
-                        </div>
-                      </td>
-                      <td>24 Jun 2023</td>
-                      <td>350.000đ</td>
-                      <td><span className="badge bg-success">Completed</span></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </Card.Body>
-          </Card>
         </>
       )}
 
       {/* Users Tab Content */}
       {!loading && activeTab === 'users' && (
-        <>
-          <div className="mb-4">
-            <h5 className="mb-0 fw-bold">Quản Lý Người Dùng</h5>
-          </div>
-
-          <Card className="border-0 rounded-3">
-            <Card.Body className="p-0">
-              <table className="table mb-0">
-                <thead>
-                  <tr style={{ backgroundColor: '#e9ecef' }}>
-                    <th 
-                      className="py-3 px-4"
-                      style={{ 
-                        fontSize: '16px', 
-                        fontWeight: '500',
-                        borderBottom: 'none'
-                      }}
-                    >
-                      Người dùng
-                    </th>
-                    <th 
-                      className="py-3 px-4"
-                      style={{ 
-                        fontSize: '16px', 
-                        fontWeight: '500',
-                        borderBottom: 'none'
-                      }}
-                    >
-                      Quyền Hạn
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} style={{ backgroundColor: '#f2f2f2' }}>
-                      <td 
-                        className="py-3 px-4"
-                        style={{ 
-                          fontSize: '14px',
-                          borderTop: '1px solid #e9ecef',
-                          borderBottom: 'none'
-                        }}
-                      >
-                        {user.name}
-                      </td>
-                      <td 
-                        className="py-3 px-4"
-                        style={{ 
-                          fontSize: '14px',
-                          borderTop: '1px solid #e9ecef',
-                          borderBottom: 'none'
-                        }}
-                      >
-                        {user.role}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card.Body>
-          </Card>
-        </>
+        <UserManagement />
       )}
 
       {/* Messages Tab Content */}
@@ -957,86 +791,7 @@ const AdminPage = () => {
 
       {/* Permissions Tab Content */}
       {!loading && activeTab === 'permissions' && (
-        <Card className="border-0 rounded-4 p-0">
-          <Card.Body className="p-4">
-            <h5 className="mb-4">Quản Lý Phân Quyền</h5>
-            
-            {/* Tab Navigation */}
-            <div className="d-flex mb-4">
-              <Button
-                variant={permissionTab === 'teacher' ? 'primary' : 'light'}
-                className={`me-2 rounded-pill px-4 ${permissionTab !== 'teacher' && 'border'}`}
-                onClick={() => setPermissionTab('teacher')}
-                style={{
-                  backgroundColor: permissionTab === 'teacher' ? '#253B80' : 'white',
-                  borderColor: permissionTab !== 'teacher' ? '#dee2e6' : '#253B80',
-                  fontSize: '14px'
-                }}
-              >
-                Giảng Viên
-              </Button>
-              <Button
-                variant={permissionTab === 'student' ? 'primary' : 'light'}
-                className={`rounded-pill px-4 ${permissionTab !== 'student' && 'border'}`}
-                onClick={() => setPermissionTab('student')}
-                style={{
-                  backgroundColor: permissionTab === 'student' ? '#253B80' : 'white',
-                  borderColor: permissionTab !== 'student' ? '#dee2e6' : '#253B80',
-                  fontSize: '14px'
-                }}
-              >
-                Sinh viên
-              </Button>
-            </div>
-            
-            {/* User list */}
-            <div className="user-list">
-              {filteredPermissionUsers.map((user) => (
-                <div 
-                  key={user.id} 
-                  className="user-item mb-3 p-3 rounded-3 d-flex align-items-center justify-content-between"
-                  style={{ backgroundColor: '#f8f9fa' }}
-                >
-                  <div className="d-flex align-items-center">
-                    <div className="user-photo me-3">
-                      <img 
-                        src={user.photo}
-                        alt={user.name}
-                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = avatarPlaceholder;
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div className="fw-medium" style={{ fontSize: '14px' }}>{user.name}</div>
-                      <div className="text-muted" style={{ fontSize: '12px' }}>Nhóm quyền: {user.role}</div>
-                    </div>
-                  </div>
-                  <div className="d-flex">
-                    <Button 
-                      variant="light" 
-                      className="me-2 border" 
-                      size="sm"
-                      onClick={() => handleEditPermissions(user)}
-                      style={{ fontSize: '12px' }}
-                    >
-                      Chỉnh sửa quyền
-                    </Button>
-                    <Button 
-                      variant="primary" 
-                      size="sm"
-                      style={{ backgroundColor: '#253B80', fontSize: '12px' }}
-                    >
-                      Xóa
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card.Body>
-        </Card>
+        <PermissionsManager />
       )}
 
       {/* Reports Tab Content */}
@@ -1162,6 +917,16 @@ const AdminPage = () => {
             </div>
           </Card.Body>
         </Card>
+      )}
+
+      {/* Documents Tab Content */}
+      {!loading && activeTab === 'documents' && (
+        <DocumentsManagement />
+      )}
+
+      {/* Groups Tab Content */}
+      {!loading && activeTab === 'groups' && (
+        <GroupManagement />
       )}
     </AdminLayout>
   );

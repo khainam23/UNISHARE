@@ -1,6 +1,16 @@
-import api, { getCsrfToken } from './api';
 import authService from './authService';
 import profileService from './profileService';
+import documentService from './documentService';
 import adminService from './adminService';
+import api, { getCsrfToken, checkApiAvailability, apiRequestWithRetry } from './api';
 
-export { api, getCsrfToken, authService, profileService, adminService };
+export {
+  authService,
+  profileService,
+  documentService,
+  adminService,
+  api,
+  getCsrfToken,
+  checkApiAvailability,
+  apiRequestWithRetry
+};

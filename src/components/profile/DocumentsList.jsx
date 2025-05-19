@@ -25,15 +25,26 @@ const DocumentsList = () => {
       
       const response = await profileService.getUserDocuments({ page, per_page: 10 });
       
-      if (response.success) {
-        setDocuments(response.data || []);
+      // The response is already successful if we received data
+      if (response.data && Array.isArray(response.data)) {
+        setDocuments(response.data);
         setTotalPages(response.meta?.last_page || 1);
-      } else {
-        throw new Error(response.message || 'Không thể tải danh sách tài liệu');
+      } else if (response.data === undefined) {
+        throw new Error('Không nhận được dữ liệu từ máy chủ');
       }
     } catch (err) {
       console.error("Error fetching documents:", err);
-      setError('Không thể tải danh sách tài liệu. Vui lòng thử lại sau.');
+      
+      // Handle role-based errors specifically
+      if (err.response && err.response.status === 403) {
+        if (err.response.data?.message?.includes('role')) {
+          setError('Bạn không có quyền truy cập tài liệu. Vui lòng đảm bảo bạn đã đăng nhập với tài khoản sinh viên.');
+        } else {
+          setError('Bạn không có quyền truy cập tài liệu.');
+        }
+      } else {
+        setError('Không thể tải danh sách tài liệu. Vui lòng thử lại sau.');
+      }
     } finally {
       setLoading(false);
     }
@@ -55,7 +66,8 @@ const DocumentsList = () => {
       
       const response = await profileService.deleteDocument(documentToDelete.id);
       
-      if (response.success) {
+      // Check if response contains a message property, which indicates success
+      if (response.message && response.message.includes('thành công')) {
         setDocuments(prevDocs => prevDocs.filter(doc => doc.id !== documentToDelete.id));
         setShowDeleteModal(false);
         setDocumentToDelete(null);

@@ -1,6 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Row, Col, Spinner } from 'react-bootstrap';
+import adminService from '../../services/adminService';
 
 const Dashboard = () => {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Fetch dashboard stats on component mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await adminService.getDashboardStats();
+        setStats(data);
+      } catch (err) {
+        console.error("Error fetching dashboard stats:", err);
+        setError("Không thể tải dữ liệu thống kê");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchStats();
+  }, []);
+
   // Light blue gradient background
   const backgroundStyle = {
     background: 'linear-gradient(to bottom right, #d4eafb, #e6f4fd)',
@@ -143,6 +166,22 @@ const Dashboard = () => {
       zIndex: 1
     }
   ];
+
+  if (loading) {
+    return (
+      <div className="welcome-section mb-4 d-flex justify-content-center align-items-center" style={backgroundStyle}>
+        <Spinner animation="border" variant="primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="welcome-section mb-4 d-flex justify-content-center align-items-center" style={backgroundStyle}>
+        <div className="text-danger">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="welcome-section mb-4" style={backgroundStyle}>
