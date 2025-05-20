@@ -52,6 +52,7 @@ const UnishareMyGroups = ({ groups = [], onGroupLeft }) => {
               group={group} 
               isLeaving={leavingGroupId === group.id}
               onLeave={() => handleLeaveGroup(group.id)}
+              showLeaveButton={group.role !== 'admin'} // Hide leave button if user's role is admin
             />
           ))
         )}

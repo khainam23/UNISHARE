@@ -3,7 +3,7 @@ import { Card, Button, Row, Col, Image, Spinner, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import userAvatar from '../../assets/avatar-1.png';
 
-const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
+const UnishareGroupCard = ({ group, isLeaving = false, onLeave, showLeaveButton = true }) => {
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -31,6 +31,25 @@ const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
     }
   };
 
+  // Get creator information from the correct fields
+  const getCreatorInfo = () => {
+    // Check if creator object exists in the group data
+    if (group?.creator) {
+      return {
+        name: group.creator.name || 'Unknown',
+        avatar: group.creator.avatar || userAvatar
+      };
+    }
+    
+    // Fallback for different API response structures
+    return {
+      name: group?.created_by_user?.name || 'Unknown',
+      avatar: group?.created_by_user?.avatar_url || userAvatar
+    };
+  };
+
+  const creator = getCreatorInfo();
+
   return (
     <Card className="mb-3 border-0 shadow-sm" style={{ borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid #e3f1fb' }}>
       <Row className="g-0">
@@ -56,7 +75,7 @@ const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
             </p>
             <div className="d-flex align-items-center">
               <Image 
-                src={group?.created_by_user?.avatar_url || userAvatar} 
+                src={creator.avatar} 
                 roundedCircle 
                 width={28} 
                 height={28} 
@@ -64,7 +83,7 @@ const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
                 style={{ border: '1.5px solid #b3d8f6' }}
               />
               <small className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Người tạo: <span className="fw-semibold">{group?.created_by_user?.name || 'Unknown'}</span>
+                Người tạo: <span className="fw-semibold">{creator.name}</span>
               </small>
             </div>
           </Card.Body>
@@ -78,7 +97,7 @@ const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
             <small className="text-muted">Ngày tạo:</small>
             <small className="fw-bold text-dark">{formatDate(group?.created_at)}</small>
           </div>
-          <div className="d-flex justify-content-between">
+          <div className="d-flex justify-content-between align-items-center mt-3">
             <Button 
               as={Link}
               to={`/unishare/groups/${group.id}`}
@@ -94,24 +113,29 @@ const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
             >
               Xem thêm
             </Button>
-            <Button 
-              variant="outline-secondary" 
-              size="sm" 
-              className="w-100 ms-1"
-              style={{ 
-                fontSize: '0.85rem',
-                borderRadius: '0.5rem',
-                borderColor: '#dee2e6',
-              }}
-              onClick={onLeave}
-              disabled={isLeaving}
-            >
-              {isLeaving ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                'Thoát nhóm'
-              )}
-            </Button>
+            {showLeaveButton && (
+              <Button 
+                variant="outline-secondary" 
+                size="sm" 
+                className="w-100 ms-1"
+                style={{ 
+                  fontSize: '0.85rem',
+                  borderRadius: '0.5rem',
+                  borderColor: '#dee2e6',
+                }}
+                onClick={onLeave}
+                disabled={isLeaving}
+              >
+                {isLeaving ? (
+                  <>
+                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                    <span className="ms-2">Đang xử lý...</span>
+                  </>
+                ) : (
+                  'Thoát nhóm'
+                )}
+              </Button>
+            )}
           </div>
         </Col>
       </Row>

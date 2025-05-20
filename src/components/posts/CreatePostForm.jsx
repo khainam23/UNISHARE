@@ -1,223 +1,185 @@
 import React, { useState } from 'react';
 import { Form, Button, Spinner, Alert } from 'react-bootstrap';
-import { BsFileEarmark, BsImage, BsX } from 'react-icons/bs';
+import { BsImage, BsX } from 'react-icons/bs';
 
 const CreatePostForm = ({ groupId, onSubmit, onCancel }) => {
-  const [content, setContent] = useState('');
-  const [attachments, setAttachments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [postData, setPostData] = useState({ content: '', title: '' });
+  const [files, setFiles] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [preview, setPreview] = useState([]);
   
-  const handleAttachmentChange = (e) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files).map(file => ({
-        file,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
-      }));
-      
-      setAttachments([...attachments, ...newFiles]);
-    }
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setPostData(prev => ({ ...prev, [name]: value }));
   };
   
-  const removeAttachment = (index) => {
-    const newAttachments = [...attachments];
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
     
-    // Revoke object URL if it's an image to free up memory
-    if (newAttachments[index].preview) {
-      URL.revokeObjectURL(newAttachments[index].preview);
-    }
-    
-    newAttachments.splice(index, 1);
-    setAttachments(newAttachments);
+    // Generate previews for image files
+    selectedFiles.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setPreview(prev => [...prev, {
+            file: file.name,
+            dataUrl: e.target.result
+          }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setPreview(prev => [...prev, {
+          file: file.name,
+          dataUrl: null,
+          type: file.type
+        }]);
+      }
+    });
+  };
+  
+  const removeFile = (fileName) => {
+    setFiles(files.filter(file => file.name !== fileName));
+    setPreview(preview.filter(p => p.file !== fileName));
   };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!content.trim() && attachments.length === 0) {
-      setError('Vui lòng nhập nội dung hoặc thêm file đính kèm');
+    // Validate inputs
+    if (!postData.content.trim()) {
+      setError('Post content cannot be empty');
       return;
     }
     
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       setError('');
       
       const formData = new FormData();
-      formData.append('content', content);
+      formData.append('content', postData.content);
       
-      if (groupId) {
-        formData.append('group_id', groupId);
+      if (postData.title) {
+        formData.append('title', postData.title);
       }
       
-      // Add attachments to form data
-      attachments.forEach((attachment, index) => {
-        formData.append(`attachments[${index}]`, attachment.file);
+      files.forEach(file => {
+        formData.append('attachments[]', file);
       });
       
-      // Call onSubmit prop with the form data
+      // Pass the form data to the parent component
       await onSubmit(formData);
       
       // Reset form
-      setContent('');
+      setPostData({ content: '', title: '' });
+      setFiles([]);
+      setPreview([]);
       
-      // Revoke all object URLs
-      attachments.forEach(attachment => {
-        if (attachment.preview) {
-          URL.revokeObjectURL(attachment.preview);
-        }
-      });
-      
-      setAttachments([]);
     } catch (err) {
       console.error('Error creating post:', err);
-      setError('Không thể tạo bài viết. Vui lòng thử lại sau.');
+      setError(err.message || 'Failed to create post. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
   
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / 1048576).toFixed(2) + ' MB';
-  };
-  
   return (
-    <div className="create-post-form">
-      {error && (
-        <Alert variant="danger" className="mb-3">
-          {error}
-        </Alert>
-      )}
+    <Form onSubmit={handleSubmit}>
+      {error && <Alert variant="danger">{error}</Alert>}
       
-      <Form onSubmit={handleSubmit}>
-        <Form.Group className="mb-3">
-          <Form.Control
-            as="textarea"
-            rows={3}
-            placeholder="Bạn đang nghĩ gì?"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            disabled={loading}
-          />
-        </Form.Group>
-        
-        {attachments.length > 0 && (
-          <div className="attachments-preview mb-3">
-            <h6>File đính kèm:</h6>
-            <div className="d-flex flex-wrap gap-2">
-              {attachments.map((attachment, index) => (
-                <div key={index} className="attachment-item p-2 border rounded position-relative">
-                  {attachment.preview ? (
-                    <div className="d-flex flex-column align-items-center">
-                      <div 
-                        className="attachment-image mb-1" 
-                        style={{
-                          width: '80px',
-                          height: '80px',
-                          backgroundImage: `url(${attachment.preview})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center'
-                        }}
-                      />
-                      <small className="text-truncate" style={{maxWidth: '80px'}}>{attachment.name}</small>
+      <Form.Group className="mb-3">
+        <Form.Control
+          type="text"
+          name="title"
+          placeholder="Post title (optional)"
+          value={postData.title}
+          onChange={handleChange}
+        />
+      </Form.Group>
+      
+      <Form.Group className="mb-3">
+        <Form.Control
+          as="textarea"
+          name="content"
+          placeholder="Share something with the group..."
+          value={postData.content}
+          onChange={handleChange}
+          rows={4}
+          required
+        />
+      </Form.Group>
+      
+      {preview.length > 0 && (
+        <div className="mb-3 attachment-previews">
+          <div className="d-flex flex-wrap gap-2">
+            {preview.map((p, index) => (
+              <div key={index} className="position-relative attachment-preview">
+                {p.dataUrl ? (
+                  <img 
+                    src={p.dataUrl} 
+                    alt={p.file} 
+                    className="img-thumbnail" 
+                    style={{ height: '100px', width: '100px', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <div className="file-icon rounded p-2 border" style={{ height: '100px', width: '100px' }}>
+                    <div className="text-center">
+                      <i className="bi bi-file-earmark fs-3"></i>
+                      <p className="small text-truncate">{p.file}</p>
                     </div>
-                  ) : (
-                    <div className="d-flex flex-column align-items-center">
-                      <BsFileEarmark size={40} className="mb-2" />
-                      <small className="text-truncate" style={{maxWidth: '80px'}}>{attachment.name}</small>
-                      <small className="text-muted">{formatFileSize(attachment.size)}</small>
-                    </div>
-                  )}
-                  
-                  <Button 
-                    variant="light" 
-                    size="sm" 
-                    className="position-absolute top-0 end-0 rounded-circle p-0"
-                    style={{width: '24px', height: '24px'}}
-                    onClick={() => removeAttachment(index)}
-                  >
-                    <BsX />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        <div className="d-flex justify-content-between align-items-center">
-          <div>
-            <Button 
-              variant="outline-secondary" 
-              className="me-2"
-              onClick={() => document.getElementById('file-upload').click()}
-              disabled={loading}
-            >
-              <BsFileEarmark className="me-1" />
-              Thêm file
-            </Button>
-            
-            <Button 
-              variant="outline-secondary"
-              onClick={() => document.getElementById('image-upload').click()}
-              disabled={loading}
-            >
-              <BsImage className="me-1" />
-              Thêm ảnh
-            </Button>
-            
-            <input 
-              type="file" 
-              id="file-upload"
-              className="d-none"
-              onChange={handleAttachmentChange}
-              multiple
-              disabled={loading}
-            />
-            
-            <input 
-              type="file" 
-              id="image-upload"
-              className="d-none"
-              onChange={handleAttachmentChange}
-              accept="image/*"
-              multiple
-              disabled={loading}
-            />
-          </div>
-          
-          <div>
-            <Button 
-              variant="secondary" 
-              className="me-2"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              Hủy
-            </Button>
-            
-            <Button 
-              variant="primary" 
-              type="submit"
-              disabled={loading || (!content.trim() && attachments.length === 0)}
-            >
-              {loading ? (
-                <>
-                  <Spinner animation="border" size="sm" className="me-1" />
-                  Đang đăng...
-                </>
-              ) : (
-                'Đăng bài'
-              )}
-            </Button>
+                  </div>
+                )}
+                <Button 
+                  variant="danger" 
+                  size="sm" 
+                  className="position-absolute top-0 end-0 rounded-circle p-1"
+                  onClick={() => removeFile(p.file)}
+                >
+                  <BsX />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
-      </Form>
-    </div>
+      )}
+      
+      <div className="d-flex justify-content-between">
+        <div>
+          <Form.Group controlId="fileUpload">
+            <Button 
+              variant="outline-secondary" 
+              as="label" 
+              htmlFor="attachments" 
+              className="d-inline-flex align-items-center"
+            >
+              <BsImage className="me-1" /> Add Photos
+            </Button>
+            <Form.Control 
+              type="file" 
+              id="attachments" 
+              multiple 
+              accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+          </Form.Group>
+        </div>
+        
+        <div className="d-flex gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Spinner animation="border" size="sm" /> Posting...
+              </>
+            ) : 'Post'}
+          </Button>
+        </div>
+      </div>
+    </Form>
   );
 };
 

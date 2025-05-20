@@ -476,6 +476,43 @@ const profileService = {
   },
 
   /**
+   * Create a new post in a group
+   * @param {Number} groupId - The group ID
+   * @param {Object} postData - Post data to create
+   * @returns {Promise} Promise with created post
+   */
+  createGroupPost: async (groupId, postData) => {
+    try {
+      let config = {};
+      
+      // Set the right content type for FormData
+      if (postData instanceof FormData) {
+        config = {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        };
+      }
+      
+      const response = await api.post(`/groups/${groupId}/posts`, postData, config);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: 'Post created successfully'
+      };
+    } catch (error) {
+      console.error(`Error creating post in group ${groupId}:`, error);
+      
+      return { 
+        success: false, 
+        message: error.response?.data?.message || error.message || 'Failed to create post',
+        errors: error.response?.data?.errors || {}
+      };
+    }
+  },
+
+  /**
    * Delete a user's document with proper role check
    * @param {Number} documentId - The ID of the document to delete
    * @returns {Promise} Promise with success message
