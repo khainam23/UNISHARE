@@ -1,6 +1,7 @@
 import authService from './authService';
-import profileService from './profileService';
 import documentService from './documentService';
+import homeService from './homeService';
+import profileService from './profileService';
 import adminService from './adminService';
 import chatService from './chatService';
 import groupService from './groupService';
@@ -9,8 +10,8 @@ import api, { getCsrfToken, checkApiAvailability, apiRequestWithRetry } from './
 
 export {
   authService,
-  profileService,
   documentService,
+  homeService,
   adminService,
   chatService,
   groupService,
@@ -18,5 +19,6 @@ export {
   api,
   getCsrfToken,
   checkApiAvailability,
-  apiRequestWithRetry
+  apiRequestWithRetry,
+  profileService
 };

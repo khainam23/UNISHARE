@@ -52,15 +52,18 @@ const BlogSection = () => {
                 blogs.map(blog => (
                   <Col md={3} className="mb-4" key={blog.id}>
                     <Card className="h-100 border-0 shadow-sm">
-                      <Card.Img 
-                        variant="top" 
-                        src={blog.thumbnail || defaultBlogImage} 
-                        alt={blog.title}
-                      />
+                      <div className="blog-img-container" style={{ height: "160px", overflow: "hidden" }}>
+                        <Card.Img 
+                          variant="top" 
+                          src={blog.thumbnail || defaultBlogImage}
+                          alt={blog.title}
+                          style={{ objectFit: "cover", height: "100%", width: "100%" }}
+                        />
+                      </div>
                       <Card.Body>
                         <small className="text-muted">{formatDate(blog.created_at)}</small>
                         <Card.Title className="mt-2">{blog.title}</Card.Title>
-                        <Card.Text>{blog.excerpt || blog.content.substring(0, 100)}...</Card.Text>
+                        <Card.Text>{blog.excerpt || blog.content?.substring(0, 100)}...</Card.Text>
                         <Link to={`/blog/${blog.id}`} className="stretched-link"></Link>
                       </Card.Body>
                     </Card>
@@ -72,11 +75,6 @@ const BlogSection = () => {
                 </Col>
               )}
             </Row>
-            <div className="text-center mt-4">
-              <Link to="/blog">
-                <Button variant="outline-primary" className="rounded-pill">Xem tất cả bài viết</Button>
-              </Link>
-            </div>
           </>
         )}
       </Container>

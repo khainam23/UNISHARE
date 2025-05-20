@@ -45,12 +45,15 @@ const DocumentsSection = () => {
                 documents.map(doc => (
                   <Col md={2} sm={6} className="mb-4" key={doc.id}>
                     <Card className="h-100 border-0 shadow-sm">
-                      <Card.Img 
-                        variant="top" 
-                        src={doc.thumbnail || defaultDocumentImage} 
-                        alt={doc.title}
-                        className="document-thumbnail"
-                      />
+                      <div className="document-img-container" style={{ height: "150px", overflow: "hidden" }}>
+                        <Card.Img 
+                          variant="top" 
+                          src={doc.thumbnail || defaultDocumentImage} 
+                          alt={doc.title}
+                          className="document-thumbnail"
+                          style={{ objectFit: "contain", height: "100%", width: "100%" }}
+                        />
+                      </div>
                       <Card.Body className="text-center">
                         <Card.Title className="small text-truncate">{doc.title}</Card.Title>
                         <Link to={`/documents/${doc.id}`}>
@@ -66,11 +69,6 @@ const DocumentsSection = () => {
                 </Col>
               )}
             </Row>
-            <div className="text-center mt-4">
-              <Link to="/documents">
-                <Button variant="outline-primary" className="rounded-pill">Xem tất cả tài liệu</Button>
-              </Link>
-            </div>
           </>
         )}
       </Container>

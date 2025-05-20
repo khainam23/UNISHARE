@@ -1,68 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Spinner } from 'react-bootstrap';
-import homeService from '../../services/homeService';
+import React from 'react';
+import { Container, Row, Col, Card } from 'react-bootstrap';
 import avatar1 from '../../assets/avatar-1.png';
 import avatar2 from '../../assets/avatar-2.png';
 import avatar3 from '../../assets/avatar-3.png';
 
-// Default avatar images mapping
-const defaultAvatars = [avatar1, avatar2, avatar3];
+// Hardcoded testimonial data
+const testimonials = [
+  {
+    id: 1,
+    name: 'Nguyễn Văn A',
+    role: 'Sinh viên Đại học Khoa học Tự nhiên',
+    content: 'UniShare đã giúp tôi tìm được rất nhiều tài liệu học tập chất lượng. Tôi đã cải thiện điểm số đáng kể nhờ vào nền tảng này!',
+    avatar: avatar1
+  },
+  {
+    id: 2,
+    name: 'Trần Thị B',
+    role: 'Sinh viên năm 3, Đại học Công nghệ',
+    content: 'Tôi thực sự ấn tượng với cộng đồng học tập tại UniShare. Mọi người rất nhiệt tình giúp đỡ và chia sẻ kiến thức với nhau.',
+    avatar: avatar2
+  },
+  {
+    id: 3,
+    name: 'Lê Văn C',
+    role: 'Sinh viên năm cuối, Đại học Bách Khoa',
+    content: 'Nhờ các nhóm học tập trên UniShare, tôi đã kết nối được với nhiều bạn cùng ngành và tạo được mạng lưới quan hệ rộng lớn.',
+    avatar: avatar3
+  }
+];
 
 const TestimonialsSection = () => {
-  const [testimonials, setTestimonials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchTestimonials = async () => {
-      try {
-        const data = await homeService.getTestimonials();
-        setTestimonials(data);
-      } catch (err) {
-        console.error('Error fetching testimonials:', err);
-        setError('Failed to load testimonials');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTestimonials();
-  }, []);
-
-  if (loading) {
-    return (
-      <section className="testimonials-section py-5 bg-light">
-        <Container className="text-center">
-          <h2 className="mb-5">Học viên nói gì về Unishare</h2>
-          <Spinner animation="border" variant="primary" />
-        </Container>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section className="testimonials-section py-5 bg-light">
-        <Container className="text-center">
-          <h2 className="mb-5">Học viên nói gì về Unishare</h2>
-          <p className="text-danger">{error}</p>
-        </Container>
-      </section>
-    );
-  }
-
   return (
     <section className="testimonials-section py-5 bg-light">
       <Container>
         <h2 className="text-center mb-5">Học viên nói gì về Unishare</h2>
         <Row>
-          {testimonials.map((testimonial, index) => (
+          {testimonials.map((testimonial) => (
             <Col md={4} className="mb-4" key={testimonial.id}>
               <Card className="h-100 border-0 shadow-sm">
                 <Card.Body>
                   <div className="d-flex align-items-center mb-3">
                     <img 
-                      src={testimonial.avatar || defaultAvatars[index % defaultAvatars.length]} 
+                      src={testimonial.avatar} 
                       alt={testimonial.name} 
                       className="rounded-circle me-3" 
                       width="60" 

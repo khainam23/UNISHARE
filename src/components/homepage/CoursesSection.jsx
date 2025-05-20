@@ -45,11 +45,14 @@ const CoursesSection = () => {
                 courses.map(course => (
                   <Col md={3} sm={6} className="mb-4" key={course.id}>
                     <Card className="h-100 border-0 shadow-sm">
-                      <Card.Img 
-                        variant="top" 
-                        src={course.thumbnail || defaultCourseImage} 
-                        alt={course.title}
-                      />
+                      <div className="course-img-container" style={{ height: "160px", overflow: "hidden" }}>
+                        <Card.Img 
+                          variant="top" 
+                          src={course.thumbnail || defaultCourseImage} 
+                          alt={course.title}
+                          style={{ objectFit: "cover", height: "100%", width: "100%" }}
+                        />
+                      </div>
                       <Card.Body>
                         <Card.Title>{course.title}</Card.Title>
                         <Card.Text>{course.description}</Card.Text>
@@ -71,11 +74,6 @@ const CoursesSection = () => {
                 </Col>
               )}
             </Row>
-            <div className="text-center mt-4">
-              <Link to="/courses">
-                <Button variant="outline-primary" className="rounded-pill">Xem tất cả khóa học</Button>
-              </Link>
-            </div>
           </>
         )}
       </Container>
