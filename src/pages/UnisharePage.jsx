@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Container, Row, Col, Spinner, Alert } from 'react-bootstrap';
-import { useParams } from 'react-router-dom';
+import { Container, Row, Col, Spinner, Alert, Button } from 'react-bootstrap';
+import { useParams, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import UnishareWelcomeBanner from '../components/unishare/UnishareWelcomeBanner';
@@ -201,8 +201,26 @@ const UnisharePage = () => {
         return (
           <>
             <UnishareWelcomeBanner />
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Nhóm học tiêu biểu</h5>
+              <Button
+                as={Link}
+                to="/unishare/create-course"
+                className="d-flex align-items-center fw-bold"
+                style={{
+                  background: 'linear-gradient(90deg, #0370b7 60%, #4fc3f7 100%)',
+                  border: 'none',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem 1.2rem',
+                  boxShadow: '0 2px 8px rgba(3,112,183,0.15)'
+                }}
+              >
+                <i className="fas fa-plus me-2"></i> Tạo nhóm học
+              </Button>
+            </div>
             <UnishareCourseSection 
-              title="Nhóm học tiêu biểu"
+              title=""
               courses={featuredGroups}
             />
           </>

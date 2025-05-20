@@ -111,23 +111,22 @@ const UnshareSidebar = ({ activeSection = 'home', hasNewMessages = false }) => {
           minWidth: 250,
         }}
       >
-        {permissionChecked && canCreateGroups && (
-          <Link to="/unishare/create-course" className="text-decoration-none">
-            <Button
-              variant="primary"
-              className="w-100 mb-3 d-flex align-items-center justify-content-center fw-bold"
-              style={{
-                background: 'linear-gradient(90deg, #0370b7 60%, #4fc3f7 100%)',
-                border: 'none',
-                borderRadius: '0.75rem',
-                fontSize: '1rem',
-                boxShadow: '0 2px 8px rgba(3,112,183,0.08)'
-              }}
-            >
-              <FaPlus className="me-2" /> Tạo nhóm học
-            </Button>
-          </Link>
-        )}
+        {/* Always show the Create Group button regardless of permission */}
+        <Link to="/unishare/create-course" className="text-decoration-none">
+          <Button
+            variant="primary"
+            className="w-100 mb-3 d-flex align-items-center justify-content-center fw-bold"
+            style={{
+              background: 'linear-gradient(90deg, #0370b7 60%, #4fc3f7 100%)',
+              border: 'none',
+              borderRadius: '0.75rem',
+              fontSize: '1rem',
+              boxShadow: '0 2px 8px rgba(3,112,183,0.08)'
+            }}
+          >
+            <FaPlus className="me-2" /> Tạo nhóm học
+          </Button>
+        </Link>
         
         <Nav className="flex-column gap-1">
           <Nav.Link
