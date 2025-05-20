@@ -133,4 +133,55 @@ class Group extends Model
         
         return $result > 0;
     }
+
+    /**
+     * Get the "is_private" accessor - for backward compatibility
+     *
+     * @return bool
+     */
+    public function getIsPrivateAttribute()
+    {
+        return $this->requires_approval === true || $this->type === 'private';
+    }
+
+    /**
+     * Set the "is_private" attribute - for backward compatibility
+     *
+     * @param bool $value
+     * @return void
+     */
+    public function setIsPrivateAttribute($value)
+    {
+        $this->attributes['requires_approval'] = (bool)$value;
+    }
+
+    /**
+     * Scope a query to only include private groups.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopePrivate($query)
+    {
+        return $query->where('requires_approval', true)
+                    ->orWhere('type', 'private');
+    }
+
+    /**
+     * Scope a query to only include public groups.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopePublic($query)
+    {
+        return $query->where(function($q) {
+            $q->where('requires_approval', false)
+               ->orWhereNull('requires_approval');
+        })
+        ->where(function($q) {
+            $q->where('type', '!=', 'private')
+               ->orWhereNull('type');
+        });
+    }
 }

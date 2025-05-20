@@ -24,6 +24,7 @@ class GroupController extends Controller
     
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Group::query();
         
         // Apply filters
@@ -31,31 +32,58 @@ class GroupController extends Controller
             $query->where('type', $request->type);
         }
         
-        if ($request->has('course_code')) {
-            $query->where('course_code', $request->course_code);
-        }
-        
         if ($request->has('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('description', 'like', '%' . $request->search . '%');
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'like', "%{$searchTerm}%")
+                  ->orWhere('description', 'like', "%{$searchTerm}%")
+                  ->orWhere('course_code', 'like', "%{$searchTerm}%");
             });
         }
         
-        // Show only public groups or groups the user is a member of
-        $query->where(function ($q) use ($request) {
-            $q->where('is_private', false)
-              ->orWhereHas('members', function ($q) use ($request) {
-                  $q->where('user_id', $request->user()->id);
-              });
-        });
+        // If user is authenticated, include their joined groups as well as public groups
+        if ($user) {
+            $userId = $user->id;
+            
+            // Use requires_approval instead of is_private
+            $query->where(function($q) use ($userId) {
+                // Include public groups (where requires_approval is false or null)
+                $q->where('requires_approval', false)
+                  ->orWhereNull('requires_approval')
+                  // Include groups where the user is a member
+                  ->orWhereExists(function($subquery) use ($userId) {
+                      $subquery->select(\DB::raw(1))
+                               ->from('users')
+                               ->join('group_members', 'users.id', '=', 'group_members.user_id')
+                               ->whereRaw('groups.id = group_members.group_id')
+                               ->where('user_id', $userId);
+                  });
+            });
+        } else {
+            // For guest users, only include public groups
+            $query->where(function($q) {
+                $q->where('requires_approval', false)
+                  ->orWhereNull('requires_approval');
+            });
+        }
         
-        // Sort by latest
-        $query->latest();
+        // Apply sorting
+        if ($request->has('sort_by')) {
+            $sortField = $request->sort_by;
+            $sortDirection = $request->input('sort_direction', 'asc');
+            
+            if (in_array($sortField, ['name', 'created_at', 'member_count'])) {
+                $query->orderBy($sortField, $sortDirection);
+            }
+        } else {
+            // Default sort by newest
+            $query->orderBy('created_at', 'desc');
+        }
         
-        $groups = $query->paginate(15);
+        $perPage = $request->input('per_page', 15);
+        $groups = $query->paginate($perPage);
         
-        return GroupResource::collection($groups);
+        return response()->json($groups);
     }
     
     public function store(Request $request)
