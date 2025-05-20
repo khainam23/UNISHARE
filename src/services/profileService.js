@@ -1166,7 +1166,95 @@ const profileService = {
     } catch (error) {
       throw error.response ? error.response.data : error;
     }
-  }
+  },
+
+  /**
+   * Report a post
+   * @param {Number} postId - The ID of the post to report
+   * @param {Object} reportData - The report data including reason and description
+   * @returns {Promise} Promise with success message
+   */
+  reportPost: async (postId, reportData) => {
+    try {
+      const response = await api.post('/reports', {
+        reportable_type: 'post',
+        reportable_id: postId,
+        reason: reportData.reason,
+        details: reportData.details
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Report a user
+   * @param {Number} userId - The ID of the user to report
+   * @param {Object} reportData - The report data including reason and description
+   * @returns {Promise} Promise with success message
+   */
+  reportUser: async (userId, reportData) => {
+    try {
+      const response = await api.post('/reports', {
+        reportable_type: 'user',
+        reportable_id: userId,
+        reason: reportData.reason,
+        details: reportData.details
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Report a comment
+   * @param {Number} commentId - The ID of the comment to report
+   * @param {Object} reportData - The report data including reason and description
+   * @returns {Promise} Promise with success message
+   */
+  reportComment: async (commentId, reportData) => {
+    try {
+      const response = await api.post('/reports', {
+        reportable_type: 'comment',
+        reportable_id: commentId,
+        reason: reportData.reason,
+        details: reportData.details
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get user's reports
+   * @param {Object} params - Query parameters like page, status, etc.
+   * @returns {Promise} Promise with user's reports
+   */
+  getUserReports: async (params = {}) => {
+    try {
+      const response = await api.get('/user/reports', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Cancel a user's report
+   * @param {Number} reportId - The ID of the report to cancel
+   * @returns {Promise} Promise with success message
+   */
+  cancelReport: async (reportId) => {
+    try {
+      const response = await api.post(`/reports/${reportId}/cancel`);
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : error;
+    }
+  },
 };
 
 export default profileService;

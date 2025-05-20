@@ -1,39 +1,78 @@
-import React from 'react';
-import { Container, Row, Col, Card, Button } from 'react-bootstrap';
-import document1 from '../../assets/document-1.png';
-import document2 from '../../assets/document-2.png';
-import document3 from '../../assets/document-3.png';
-import document4 from '../../assets/document-4.png';
-import document5 from '../../assets/document-5.png';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Spinner, Alert } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import homeService from '../../services/homeService';
+import defaultDocumentImage from '../../assets/document-placeholder.png';
 
 const DocumentsSection = () => {
-  const documents = [
-    { id: 1, image: document1 },
-    { id: 2, image: document2 },
-    { id: 3, image: document3 },
-    { id: 4, image: document4 },
-    { id: 5, image: document5 }
-  ];
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const data = await homeService.getFreeDocuments();
+        setDocuments(data);
+      } catch (err) {
+        console.error('Error fetching documents:', err);
+        setError('Failed to load documents');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, []);
 
   return (
     <section className="documents-section py-5">
       <Container>
         <h2 className="text-center mb-5">Tài liệu tham khảo miễn phí</h2>
-        <Row>
-          {documents.map(doc => (
-            <Col md={2} sm={6} className="mb-4" key={doc.id}>
-              <Card className="h-100 border-0 shadow-sm">
-                <Card.Img variant="top" src={doc.image} />
-                <Card.Body className="text-center">
-                  <Button variant="link" className="text-decoration-none">Tải xuống</Button>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-        <div className="text-center mt-4">
-          <Button variant="outline-primary" className="rounded-pill">Xem tất cả tài liệu</Button>
-        </div>
+        
+        {loading ? (
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
+          </div>
+        ) : error ? (
+          <Alert variant="danger" className="text-center">
+            {error}
+          </Alert>
+        ) : (
+          <>
+            <Row>
+              {documents.length > 0 ? (
+                documents.map(doc => (
+                  <Col md={2} sm={6} className="mb-4" key={doc.id}>
+                    <Card className="h-100 border-0 shadow-sm">
+                      <Card.Img 
+                        variant="top" 
+                        src={doc.thumbnail || defaultDocumentImage} 
+                        alt={doc.title}
+                        className="document-thumbnail"
+                      />
+                      <Card.Body className="text-center">
+                        <Card.Title className="small text-truncate">{doc.title}</Card.Title>
+                        <Link to={`/documents/${doc.id}`}>
+                          <Button variant="link" className="text-decoration-none">Tải xuống</Button>
+                        </Link>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                ))
+              ) : (
+                <Col className="text-center py-4">
+                  <p>Không có tài liệu nào hiện tại.</p>
+                </Col>
+              )}
+            </Row>
+            <div className="text-center mt-4">
+              <Link to="/documents">
+                <Button variant="outline-primary" className="rounded-pill">Xem tất cả tài liệu</Button>
+              </Link>
+            </div>
+          </>
+        )}
       </Container>
     </section>
   );

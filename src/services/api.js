@@ -29,8 +29,35 @@ api.interceptors.request.use(
     }
     
     // Add debugging header to track requests
-    config.headers['X-Debug-User-Role'] = localStorage.getItem('user') ? 
-      JSON.parse(localStorage.getItem('user'))?.roles?.[0]?.name || 'unknown' : 'not-logged-in';
+    const userData = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+    
+    // Improved role detection that handles different role formats
+    let isLecturer = false;
+    let userRole = 'unknown';
+    
+    if (userData && userData.roles) {
+      const roles = Array.isArray(userData.roles) ? userData.roles : [userData.roles];
+      
+      // Find the first role for debugging header
+      if (roles.length > 0) {
+        const firstRole = roles[0];
+        userRole = typeof firstRole === 'string' ? firstRole : (firstRole.name || 'unknown');
+      }
+      
+      // Check if any role is a lecturer
+      isLecturer = roles.some(role => {
+        const roleName = typeof role === 'string' ? role : (role.name || '');
+        return roleName.toLowerCase() === 'lecturer';
+      });
+    }
+    
+    config.headers['X-Debug-User-Role'] = userRole;
+    
+    // Add special header for lecturers to help the server recognize them
+    if (isLecturer) {
+      config.headers['X-Override-Role'] = 'lecturer';
+      console.log('Lecturer role detected, adding X-Override-Role header');
+    }
       
     return config;
   },
@@ -254,6 +281,22 @@ export const downloadFile = async (url, filename) => {
  */
 export const apiRequestWithRetry = async (method, url, data = null, options = {}, retries = 3, delay = 1000) => {
   let lastError;
+  
+  // Ensure the options object has headers
+  if (!options.headers) {
+    options.headers = {};
+  }
+  
+  // Add auth token to headers if available
+  const token = localStorage.getItem('token');
+  if (token && !options.headers['Authorization']) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  // Set content type for JSON data (if not already set and not FormData)
+  if (data && !(data instanceof FormData) && !options.headers['Content-Type']) {
+    options.headers['Content-Type'] = 'application/json';
+  }
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {

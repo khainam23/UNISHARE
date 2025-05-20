@@ -5,15 +5,22 @@
 /**
  * Check if a user has a specific role
  * @param {Object} user - The user object
- * @param {String} roleName - The role name to check
+ * @param {String} roleName - The role name to check (case insensitive)
  * @returns {Boolean} - True if the user has the role
  */
 export const hasRole = (user, roleName) => {
-  if (!user || !user.roles || !Array.isArray(user.roles)) {
+  if (!user || !user.roles) {
     return false;
   }
   
-  return user.roles.some(role => role.name === roleName);
+  // Handle both array and single role objects
+  const roles = Array.isArray(user.roles) ? user.roles : [user.roles];
+  
+  return roles.some(role => {
+    // Role can be a string or an object with a name property
+    const roleValue = typeof role === 'string' ? role : (role.name || '');
+    return roleValue.toLowerCase() === roleName.toLowerCase();
+  });
 };
 
 /**
@@ -22,10 +29,7 @@ export const hasRole = (user, roleName) => {
  * @returns {Boolean} true if user has admin role
  */
 export const isAdmin = (user) => {
-  if (!user || !user.roles || !Array.isArray(user.roles)) {
-    return false;
-  }
-  return user.roles.some(role => role.name === 'admin');
+  return hasRole(user, 'admin');
 };
 
 /**
@@ -34,10 +38,7 @@ export const isAdmin = (user) => {
  * @returns {Boolean} true if user has moderator role
  */
 export const isModerator = (user) => {
-  if (!user || !user.roles || !Array.isArray(user.roles)) {
-    return false;
-  }
-  return user.roles.some(role => role.name === 'moderator');
+  return hasRole(user, 'moderator');
 };
 
 /**
@@ -56,6 +57,39 @@ export const isLecturer = (user) => {
  */
 export const isStudent = (user) => {
   return hasRole(user, 'student');
+};
+
+/**
+ * Check if user has any of the specified roles
+ * @param {Object} user - The user object
+ * @param {Array} roles - Array of role names to check
+ * @returns {Boolean} - True if user has any of the roles
+ */
+export const hasAnyRole = (user, roles) => {
+  if (!user || !user.roles || !Array.isArray(roles)) {
+    return false;
+  }
+  
+  return roles.some(role => hasRole(user, role));
+};
+
+/**
+ * Check if user has permission to create groups
+ * @param {Object} user - The user object
+ * @returns {Boolean} - True if user can create groups
+ */
+export const canCreateGroups = (user) => {
+  // These roles always have permission to create groups
+  if (isAdmin(user) || isModerator(user) || isLecturer(user)) {
+    return true;
+  }
+  
+  // Check explicit permissions
+  if (user && user.permissions && Array.isArray(user.permissions)) {
+    return user.permissions.includes('create group');
+  }
+  
+  return false;
 };
 
 /**
@@ -78,8 +112,8 @@ export const getRedirectPathForUser = (user) => {
     return '/admin/dashboard';
   }
   
-  // Third, check for teacher role
-  if (user.roles && user.roles.some(role => role.name === 'teacher')) {
+  // Third, check for lecturer role
+  if (isLecturer(user)) {
     return '/teacher/dashboard';
   }
   

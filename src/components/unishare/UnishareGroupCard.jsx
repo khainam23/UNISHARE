@@ -1,34 +1,62 @@
 import React from 'react';
-import { Card, Button, Row, Col, Image } from 'react-bootstrap';
+import { Card, Button, Row, Col, Image, Spinner, Badge } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
 import userAvatar from '../../assets/avatar-1.png';
 
-const UnishareGroupCard = ({ group }) => {
+const UnishareGroupCard = ({ group, onLeave, isLeaving = false }) => {
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN');
+  };
+
+  // Get group image URL or fallback
+  const getGroupImage = () => {
+    if (group?.cover_image && group.cover_image.startsWith('http')) {
+      return group.cover_image;
+    }
+    return require('../../assets/course-react.png');
+  };
+  
+  // Safely get group type label
+  const getGroupTypeLabel = () => {
+    if (!group?.type) return 'group';
+    
+    switch (group.type) {
+      case 'course': return 'Khóa học';
+      case 'university': return 'Trường ĐH';
+      case 'interest': return 'Sở thích';
+      default: return group.type;
+    }
+  };
+
   return (
     <Card className="mb-3 border-0 shadow-sm" style={{ borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid #e3f1fb' }}>
       <Row className="g-0">
         <Col xs={3} md={2} className="bg-primary d-flex align-items-center justify-content-center" style={{ background: 'linear-gradient(180deg, #1976d2 0%, #2196f3 100%)', minHeight: '100%' }}>
           <div className="text-center p-2">
             <img 
-              src={group?.image || require('../../assets/course-react.png')}
-              alt="Course Icon"
-              style={{ width: '60px', height: '60px' }}
+              src={getGroupImage()}
+              alt={group?.name || 'Group'}
+              style={{ width: '60px', height: '60px', objectFit: 'cover' }}
             />
           </div>
         </Col>
         <Col xs={9} md={7}>
           <Card.Body className="py-3 px-4">
             <div className="d-flex align-items-center mb-1">
-              <h6 className="fw-bold text-primary mb-0">{group?.title || 'Học React JS cơ bản'}</h6>
+              <h6 className="fw-bold text-primary mb-0">{group?.name || 'Unnamed Group'}</h6>
               <span className="ms-2 badge bg-info" style={{ fontSize: '0.7rem', padding: '0.3em 0.6em' }}>
-                {group?.level || 'cơ bản'}
+                {getGroupTypeLabel()}
               </span>
             </div>
             <p className="text-muted small mb-2" style={{ fontSize: '0.85rem' }}>
-              {group?.description || 'Khóa học giúp bạn xây dựng website chuyên nghiệp với ReactJS, làm việc với các thư viện UI và API...'}
+              {group?.description || 'No description available'}
             </p>
             <div className="d-flex align-items-center">
               <Image 
-                src={group?.instructorAvatar || userAvatar} 
+                src={group?.created_by_user?.avatar_url || userAvatar} 
                 roundedCircle 
                 width={28} 
                 height={28} 
@@ -36,7 +64,7 @@ const UnishareGroupCard = ({ group }) => {
                 style={{ border: '1.5px solid #b3d8f6' }}
               />
               <small className="text-muted" style={{ fontSize: '0.85rem' }}>
-                Giảng viên: <span className="fw-semibold">{group?.instructor || 'Thạc sĩ Phạm Hồng'}</span>
+                Người tạo: <span className="fw-semibold">{group?.created_by_user?.name || 'Unknown'}</span>
               </small>
             </div>
           </Card.Body>
@@ -44,14 +72,16 @@ const UnishareGroupCard = ({ group }) => {
         <Col xs={12} md={3} className="d-flex flex-column justify-content-center py-3 px-4" style={{ backgroundColor: '#f9fcff' }}>
           <div className="d-flex align-items-center justify-content-between mb-2">
             <small className="text-muted">Số lượng:</small>
-            <small className="fw-bold text-dark">{group?.count || '124'} SV</small>
+            <small className="fw-bold text-dark">{group?.member_count || 0} thành viên</small>
           </div>
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <small className="text-muted">Ngày học:</small>
-            <small className="fw-bold text-dark">{group?.date || '12/05/2023'}</small>
+            <small className="text-muted">Ngày tạo:</small>
+            <small className="fw-bold text-dark">{formatDate(group?.created_at)}</small>
           </div>
           <div className="d-flex justify-content-between">
             <Button 
+              as={Link}
+              to={`/unishare/groups/${group.id}`}
               variant="primary" 
               size="sm" 
               className="w-100 me-2"
@@ -73,8 +103,14 @@ const UnishareGroupCard = ({ group }) => {
                 borderRadius: '0.5rem',
                 borderColor: '#dee2e6',
               }}
+              onClick={onLeave}
+              disabled={isLeaving}
             >
-              Thoát nhóm
+              {isLeaving ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                'Thoát nhóm'
+              )}
             </Button>
           </div>
         </Col>

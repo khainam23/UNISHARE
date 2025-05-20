@@ -150,9 +150,33 @@ const adminService = {
    */
   getReports: async (filters = {}) => {
     try {
-      const response = await api.get('/admin/reports', { params: filters });
-      return response.data;
+      // Generate cache key based on filters
+      const cacheKey = `reports-${JSON.stringify(filters)}`;
+      
+      return getCachedData(cacheKey, async () => {
+        const response = await apiRequestWithRetry('get', '/admin/reports', null, {
+          params: filters
+        });
+        
+        // Handle different response formats
+        if (response.data && response.data.data) {
+          return {
+            data: response.data.data,
+            meta: response.data.meta || null
+          };
+        } else if (response.data && Array.isArray(response.data)) {
+          return { data: response.data };
+        } else if (response.data && response.data.success) {
+          return {
+            data: response.data.data || [],
+            meta: response.data.meta || null
+          };
+        } else {
+          return { data: [] };
+        }
+      }, { ttl: 60 * 1000 }); // 1 minute cache
     } catch (error) {
+      console.error("Error fetching reports:", error);
       throw error.response ? error.response.data : error;
     }
   },
@@ -162,9 +186,10 @@ const adminService = {
    */
   getReportDetails: async (reportId) => {
     try {
-      const response = await api.get(`/admin/reports/${reportId}`);
+      const response = await apiRequestWithRetry('get', `/admin/reports/${reportId}`);
       return response.data.data || response.data;
     } catch (error) {
+      console.error(`Error fetching report details for ID ${reportId}:`, error);
       throw error.response ? error.response.data : error;
     }
   },
@@ -174,13 +199,13 @@ const adminService = {
    */
   resolveReport: async (reportId, action, resolution_note) => {
     try {
-      await getCsrfToken();
-      const response = await api.post(`/admin/reports/${reportId}/resolve`, {
+      const response = await apiRequestWithRetry('post', `/admin/reports/${reportId}/resolve`, {
         action, // 'resolve' or 'reject'
         resolution_note
       });
       return response.data;
     } catch (error) {
+      console.error(`Error resolving report ID ${reportId}:`, error);
       throw error.response ? error.response.data : error;
     }
   },
@@ -479,6 +504,106 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting group:', error);
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get post statistics
+   * @returns {Promise} Promise with post statistics
+   */
+  getPostStatistics: async () => {
+    return getCachedData('post-statistics', async () => {
+      try {
+        const response = await apiRequestWithRetry('get', '/admin/statistics/posts');
+        return response.data.data || response.data;
+      } catch (error) {
+        console.error("Error fetching post statistics:", error);
+        return {
+          total: 0,
+          approved: 0,
+          pending: 0,
+          rejected: 0
+        };
+      }
+    }, { ttl: 5 * 60 * 1000 }); // 5 minute cache
+  },
+  
+  /**
+   * Get a list of posts with filtering options
+   * @param {Object} filters - Query parameters like page, status, user_id, etc.
+   * @returns {Promise} Promise with paginated posts list
+   */
+  getPosts: async (filters = {}) => {
+    try {
+      const response = await apiRequestWithRetry('get', '/admin/posts', null, {
+        params: filters
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get details of a specific post
+   * @param {Number} postId - The ID of the post
+   * @returns {Promise} Promise with post details
+   */
+  getPostDetails: async (postId) => {
+    try {
+      const response = await apiRequestWithRetry('get', `/admin/posts/${postId}`);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error(`Error fetching post details for ID ${postId}:`, error);
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Approve a post
+   * @param {Number} postId - The ID of the post to approve
+   * @returns {Promise} Promise with success message
+   */
+  approvePost: async (postId) => {
+    try {
+      const response = await apiRequestWithRetry('post', `/admin/posts/${postId}/approve`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error approving post ID ${postId}:`, error);
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Reject a post
+   * @param {Number} postId - The ID of the post to reject
+   * @param {String} reason - Reason for rejection
+   * @returns {Promise} Promise with success message
+   */
+  rejectPost: async (postId, reason) => {
+    try {
+      const response = await apiRequestWithRetry('post', `/admin/posts/${postId}/reject`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error(`Error rejecting post ID ${postId}:`, error);
+      throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Delete a post
+   * @param {Number} postId - The ID of the post to delete
+   * @param {String} reason - Reason for deletion
+   * @returns {Promise} Promise with success message
+   */
+  deletePost: async (postId, reason = '') => {
+    try {
+      const response = await apiRequestWithRetry('delete', `/admin/posts/${postId}`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting post ID ${postId}:`, error);
       throw error.response ? error.response.data : error;
     }
   }

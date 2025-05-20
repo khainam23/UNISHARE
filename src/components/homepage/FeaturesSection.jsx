@@ -1,9 +1,11 @@
-import React from 'react';
-import { Container, Row, Col, Button, Image, Card } from 'react-bootstrap'; // Added Card
-import featureImage from '../../assets/feature-image.png'; // Existing central image
-import { BsCheckCircle } from 'react-icons/bs'; // Import checkmark icon
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Button, Image, Card, Spinner } from 'react-bootstrap';
+import featureImage from '../../assets/feature-image.png';
+import { BsCheckCircle } from 'react-icons/bs';
+// Import homeService directly for use within this component only
+import homeService from '../../services/homeService';
 
-// Assuming new icon assets are in src/assets/
+// Assuming icon assets are in src/assets/
 import iconHeSinhThai from '../../assets/icon-he-sinh-thai.png';
 import iconKienThuc from '../../assets/icon-kien-thuc.png';
 import iconNoiDung from '../../assets/icon-noi-dung.png';
@@ -50,11 +52,12 @@ const FeatureItem = ({ icon, title, description }) => (
   </div>
 );
 
-const ValuePropCard = ({ text }) => (
+const ValuePropCard = ({ text, value }) => (
   <Col md={3} sm={6} className="mb-4">
     <Card className="h-100 text-center py-3 px-2 rounded-3 border shadow-sm">
       <Card.Body className="d-flex flex-column align-items-center justify-content-center">
-        <BsCheckCircle size={28} className="text-warning mb-3" /> {/* Yellow checkmark icon */}
+        <BsCheckCircle size={28} className="text-warning mb-2" />
+        {value && <h4 className="fw-bold text-primary mb-2">{value.toLocaleString()}</h4>}
         <p className="fw-medium mb-0" style={{ fontSize: '0.95rem' }}>{text}</p>
       </Card.Body>
     </Card>
@@ -62,15 +65,31 @@ const ValuePropCard = ({ text }) => (
 );
 
 const FeaturesSection = () => {
-  const valueProps = [
-    "Trải nghiệm tốt nhất",
-    "Chi phí hợp lý",
-    "Vận hành ổn định",
-    "Tự động hóa cao"
-  ];
+  const [stats, setStats] = useState({
+    users: 0,
+    courses: 0,
+    documents: 0,
+    completions: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await homeService.getPlatformStats();
+        setStats(data);
+      } catch (err) {
+        console.error('Error fetching platform stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   return (
-    <section className="features-section py-5 bg-white"> {/* Changed background to white as per image */}
+    <section className="features-section py-5 bg-white">
       <Container>
         <div className="text-center mb-5">
           <h4 className="fw-normal" style={{ marginBottom: '0.25rem', fontSize: '1.2rem' }}>Vì sao nên chọn</h4>
@@ -98,15 +117,25 @@ const FeaturesSection = () => {
           </Col>
         </Row>
 
-        {/* New Value Proposition Cards Section */}
+        {/* Platform Stats Section */}
         <Row className="mt-5 pt-4 justify-content-center">
-          {valueProps.map(propText => (
-            <ValuePropCard key={propText} text={propText} />
-          ))}
+          {loading ? (
+            <Col className="text-center">
+              <Spinner animation="border" variant="primary" size="sm" />
+            </Col>
+          ) : (
+            <>
+              <ValuePropCard text="Người dùng" value={stats.users} />
+              <ValuePropCard text="Khóa học" value={stats.courses} />
+              <ValuePropCard text="Tài liệu" value={stats.documents} />
+              <ValuePropCard text="Lượt hoàn thành" value={stats.completions} />
+            </>
+          )}
         </Row>
       </Container>
     </section>
   );
 };
 
+// Export at the end to avoid circular dependencies
 export default FeaturesSection;

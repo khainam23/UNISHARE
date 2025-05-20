@@ -1,42 +1,92 @@
-import api from './api';
+import api, { apiRequestWithRetry } from './api';
+import cacheService from './cacheService';
+import { authService } from './index';
 
 const chatService = {
   /**
    * Get user's chats
    * @param {Object} params - Query parameters like page, limit, etc.
+   * @param {boolean} useCache - Whether to use cached data if available
    * @returns {Promise} Promise with user's chats
    */
-  getUserChats: async (params = {}) => {
-    try {
-      const response = await api.get('/chats', { params });
-      
-      // Log the raw response for debugging
-      console.log('Raw getUserChats response:', response.data);
-      
-      // If the API returns a nested structure with data.data, standardize it
-      if (response.data && response.data.data) {
+  getUserChats: async (params = {}, useCache = true) => {
+    // Tạo cache key từ params và user ID
+    const user = authService.getUser();
+    const userId = user?.id || 'anonymous';
+    const cacheKey = `user_chats_${userId}_${JSON.stringify(params)}`;
+    
+    // Sử dụng memoize để tránh duplicate calls
+    if (useCache) {
+      return cacheService.memoize(
+        cacheKey,
+        async () => {
+          try {
+            const response = await api.get('/chats', { params });
+            
+            let result;
+            
+            // If the API returns a nested structure with data.data, standardize it
+            if (response.data && response.data.data) {
+              result = {
+                success: true,
+                data: response.data.data
+              };
+            }
+            // If the API returns data directly
+            else if (response.data) {
+              result = {
+                success: true,
+                data: response.data
+              };
+            }
+            else {
+              result = response.data;
+            }
+            
+            return result;
+          } catch (error) {
+            console.error('Error fetching user chats:', error.response?.data || error.message);
+            return {
+              success: false,
+              message: error.response?.data?.message || error.message || 'Could not fetch user chats',
+              data: []
+            };
+          }
+        }
+      );
+    } else {
+      try {
+        const response = await api.get('/chats', { params });
+        
+        let result;
+        
+        // If the API returns a nested structure with data.data, standardize it
+        if (response.data && response.data.data) {
+          result = {
+            success: true,
+            data: response.data.data
+          };
+        }
+        // If the API returns data directly
+        else if (response.data) {
+          result = {
+            success: true,
+            data: response.data
+          };
+        }
+        else {
+          result = response.data;
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('Error fetching user chats:', error.response?.data || error.message);
         return {
-          success: true,
-          data: response.data.data
+          success: false,
+          message: error.response?.data?.message || error.message || 'Could not fetch user chats',
+          data: []
         };
       }
-      
-      // If the API returns data directly
-      if (response.data) {
-        return {
-          success: true,
-          data: response.data
-        };
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching user chats:', error.response?.data || error.message);
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Could not fetch user chats',
-        data: []
-      };
     }
   },
 
@@ -83,22 +133,59 @@ const chatService = {
    */
   getChatMessages: async (chatId, params = {}) => {
     try {
-      const response = await api.get(`/chats/${chatId}/messages`, { params });
+      console.log(`Fetching messages for chat ${chatId}`);
       
-      // If the API returns data in a nested structure, standardize it
+      // Add sort parameter to ensure messages are returned in chronological order
+      const queryParams = { 
+        ...params,
+        sort_by: 'created_at',
+        sort_direction: 'asc' 
+      };
+      
+      const response = await apiRequestWithRetry('get', `/chats/${chatId}/messages`, null, {
+        params: queryParams
+      });
+      
+      console.log('Messages response:', response.data);
+      
+      // Standardize the response format to ensure we always return an array
       if (response.data && typeof response.data === 'object') {
+        // Check if the response has a data property that's an array
+        if (response.data.data && Array.isArray(response.data.data)) {
+          return {
+            success: true,
+            data: response.data.data
+          };
+        }
+        
+        // Check if the response itself is an array
+        if (Array.isArray(response.data)) {
+          return {
+            success: true,
+            data: response.data
+          };
+        }
+        
+        // Default fallback - return an empty array if we can't find a valid messages array
+        console.warn('Unexpected chat messages format:', response.data);
         return {
           success: true,
-          data: response.data
+          data: []
         };
       }
       
-      return response.data;
+      // If response.data is not an object, return empty array
+      return {
+        success: false,
+        message: 'Invalid response format',
+        data: []
+      };
     } catch (error) {
       console.error('Error fetching chat messages:', error.response?.data || error.message);
       return {
         success: false,
-        message: error.response?.data?.message || error.message || 'Could not fetch chat messages'
+        message: error.response?.data?.message || error.message || 'Could not fetch chat messages',
+        data: []
       };
     }
   },
@@ -111,10 +198,47 @@ const chatService = {
    */
   sendMessage: async (chatId, messageData) => {
     try {
-      const response = await api.post(`/chats/${chatId}/messages`, messageData);
-      return response.data;
+      console.log(`Sending message to chat ${chatId}:`, messageData);
+      
+      // Ensure content is sent properly
+      const payload = {
+        content: messageData.content
+      };
+      
+      const response = await apiRequestWithRetry('post', `/chats/${chatId}/messages`, payload);
+      
+      console.log('Message send response:', response.data);
+      
+      // Check for various success response formats
+      if (response.data) {
+        return {
+          success: true,
+          data: response.data.data || response.data,
+          message: 'Message sent successfully'
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Invalid response format from server'
+      };
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      console.error(`Error sending message to chat ${chatId}:`, error);
+      
+      let errorMessage = 'Could not send message';
+      
+      // Extract error message from response if available
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.response?.data || error.message
+      };
     }
   },
 
@@ -190,10 +314,10 @@ const chatService = {
         const response = await api.get(`/groups/${groupId}/chat`);
         console.log('GET chat response:', response.data);
         
-        if (response.data.success && response.data.data) {
+        if (response.data.success !== false) {
           return {
             success: true,
-            data: response.data.data
+            data: response.data.data || response.data
           };
         }
       } catch (error) {
@@ -207,14 +331,14 @@ const chatService = {
         const createResponse = await api.post(`/groups/${groupId}/chat`);
         console.log('Create chat response:', createResponse.data);
         
-        if (!createResponse.data.success) {
+        if (createResponse.data.success === false) {
           // If there was a specific error with the creation, but we want to handle it gracefully
           throw new Error(createResponse.data.message || 'Failed to create group chat');
         }
         
         return {
           success: true,
-          data: createResponse.data.data
+          data: createResponse.data.data || createResponse.data
         };
       } catch (createError) {
         // If creation failed, try one more time after a short delay
@@ -226,7 +350,7 @@ const chatService = {
           const retryResponse = await api.post(`/groups/${groupId}/chat`);
           return {
             success: true,
-            data: retryResponse.data.data
+            data: retryResponse.data.data || retryResponse.data
           };
         } catch (retryError) {
           console.error('Retry also failed:', retryError);
@@ -241,6 +365,83 @@ const chatService = {
         success: false,
         message: error.response?.data?.message || error.message || 'Could not get or create group chat',
         error: error.response?.data || error.message
+      };
+    }
+  },
+
+  /**
+   * Send a message to a group chat
+   * @param {Number} groupId - The ID of the group
+   * @param {Object} messageData - The message data
+   * @returns {Promise} Promise with sent message data
+   */
+  sendGroupMessage: async (groupId, messageData) => {
+    try {
+      // First, ensure we have a chat for this group
+      const chatResponse = await chatService.getGroupChat(groupId);
+      
+      if (!chatResponse.success || !chatResponse.data) {
+        return {
+          success: false,
+          message: 'Failed to get or create chat for this group'
+        };
+      }
+      
+      const chat = chatResponse.data;
+      const chatId = chat.id;
+      
+      // Send the message to the chat
+      const response = await api.post(`/chats/${chatId}/messages`, messageData);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data
+      };
+    } catch (error) {
+      console.error(`Error sending message to group ${groupId}:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Could not send message to group chat',
+        error: error.response?.data || error.message
+      };
+    }
+  },
+
+  /**
+   * Get group chat messages
+   * @param {Number} groupId - The ID of the group
+   * @param {Object} params - Query parameters like page, limit, etc.
+   * @returns {Promise} Promise with chat messages
+   */
+  getGroupChatMessages: async (groupId, params = {}) => {
+    try {
+      // First, ensure we have a chat for this group
+      const chatResponse = await chatService.getGroupChat(groupId);
+      
+      if (!chatResponse.success || !chatResponse.data) {
+        return {
+          success: false,
+          message: 'Failed to get or create chat for this group',
+          data: []
+        };
+      }
+      
+      const chat = chatResponse.data;
+      const chatId = chat.id;
+      
+      // Get messages for the chat
+      const response = await api.get(`/chats/${chatId}/messages`, { params });
+      
+      return {
+        success: true,
+        data: response.data.data || response.data
+      };
+    } catch (error) {
+      console.error(`Error fetching messages for group ${groupId}:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Could not fetch group chat messages',
+        data: []
       };
     }
   },
