@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ListGroup, Image, Badge, Spinner, Alert, Form, InputGroup, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { FaSearch, FaUsers, FaUser, FaCircle } from 'react-icons/fa';
@@ -10,24 +10,71 @@ const ChatSidebar = ({ activeChatId }) => {
   const [chats, setChats] = useState([]);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const isComponentMounted = useRef(true);
+  const pollIntervalRef = useRef(null);
+  
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('ChatSidebar mounted');
+    isComponentMounted.current = true;
+    
+    return () => {
+      console.log('ChatSidebar unmounted');
+      isComponentMounted.current = false;
+      
+      // Clear any intervals when component unmounts
+      if (pollIntervalRef.current) {
+        console.log('Clearing poll interval on unmount');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
+    // Define fetchChats function with isComponentMounted check
     const fetchChats = async () => {
+      if (!isComponentMounted.current) {
+        console.log('Component unmounted, skipping fetchChats');
+        return;
+      }
+      
       try {
         setLoading(true);
+        console.log('ChatSidebar: Fetching chats list');
         const response = await chatService.getUserChats();
         
+        // Check if component is still mounted before updating state
+        if (!isComponentMounted.current) {
+          console.log('Component unmounted during fetch, aborting update');
+          return;
+        }
+        
         // Better error detection - response exists and has expected structure
-        if (response && (response.success === true || (response.data && Array.isArray(response.data.data)))) {
-          // Make sure we have data in the right structure
-          const chatsData = response.data?.data || [];
-          console.log('Chats data received:', chatsData);
+        if (response) {
+          console.log('Chat response received:', response);
+          
+          // Handle different response structures
+          let chatsData = [];
+          
+          if (response.success === true && response.data) {
+            // Success response with data property
+            chatsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+          } else if (response.data) {
+            // Direct data property
+            chatsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+          } else if (Array.isArray(response)) {
+            // Response is directly an array
+            chatsData = response;
+          }
+          
+          console.log('Chats data processed, count:', chatsData.length);
           setChats(chatsData);
         } else {
           console.error('Error in chat response:', response);
-          // Only throw error if response completely missing or malformed
-          if (!response || (!response.data && !response.success)) {
-            throw new Error(response?.message || 'Không thể tải danh sách cuộc trò chuyện');
+          // Only throw error if response completely missing
+          if (!response) {
+            throw new Error('Không thể tải danh sách cuộc trò chuyện');
           } else {
             // Empty chats list is acceptable
             setChats([]);
@@ -35,18 +82,40 @@ const ChatSidebar = ({ activeChatId }) => {
         }
       } catch (err) {
         console.error('Error fetching chats:', err);
-        setError('Không thể tải danh sách cuộc trò chuyện. Vui lòng thử lại sau.');
+        if (isComponentMounted.current) {
+          setError('Không thể tải danh sách cuộc trò chuyện. Vui lòng thử lại sau.');
+        }
       } finally {
-        setLoading(false);
+        if (isComponentMounted.current) {
+          setLoading(false);
+        }
       }
     };
     
+    // Initial fetch
     fetchChats();
     
-    // Poll for new chats/messages every 30 seconds
-    const interval = setInterval(fetchChats, 30000);
+    // Poll for new chats/messages every 60 seconds (increased from 30 seconds)
+    console.log('Setting up polling for chats list');
+    pollIntervalRef.current = setInterval(() => {
+      if (isComponentMounted.current) {
+        console.log('Polling for new chats');
+        fetchChats();
+      } else {
+        // Safety check - clear interval if component is unmounted
+        console.log('Component unmounted during polling, clearing interval');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }, 60000); // Increased to 60 seconds
     
-    return () => clearInterval(interval);
+    return () => {
+      console.log('ChatSidebar unmounting, cleaning up interval');
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
   }, []);
   
   // Format timestamp to a readable format

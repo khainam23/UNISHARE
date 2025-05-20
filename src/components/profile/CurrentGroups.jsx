@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Row, Col, Image, Spinner, Alert, Modal, Badge, Pagination } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { BsPeopleFill, BsInfoCircle, BsChatDots, BsCalendarEvent } from 'react-icons/bs';
@@ -15,21 +15,68 @@ const CurrentGroups = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [groupChatUrls, setGroupChatUrls] = useState({});
+  const isComponentMounted = useRef(true);
+  const lastFetchTime = useRef({
+    groups: 0,
+    chats: {}
+  });
+  const isFetching = useRef({
+    groups: false,
+    chats: {}
+  });
+
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('CurrentGroups mounted');
+    isComponentMounted.current = true;
+    
+    return () => {
+      console.log('CurrentGroups unmounted');
+      isComponentMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
-    fetchGroups(currentPage);
+    if (isComponentMounted.current) {
+      fetchGroups(currentPage);
+    }
   }, [currentPage]);
 
   const fetchGroups = async (page) => {
+    // Prevent concurrent fetches
+    if (isFetching.current.groups) {
+      console.log('Already fetching groups, skipping');
+      return;
+    }
+    
+    // Throttle API calls - only fetch if it's been at least 5 seconds since last fetch
+    const now = Date.now();
+    if (now - lastFetchTime.current.groups < 5000) {
+      console.log('Throttling groups fetch - last fetch was too recent');
+      return;
+    }
+    
     try {
-      setLoading(true);
-      setError('');
+      isFetching.current.groups = true;
+      lastFetchTime.current.groups = now;
       
+      if (isComponentMounted.current) {
+        setLoading(true);
+        setError('');
+      }
+      
+      console.log('Fetching user groups, page:', page);
       const response = await profileService.getUserGroups({ 
         status: 'active',
         page,
         per_page: 5
       });
+      
+      // Check if component is still mounted before updating state
+      if (!isComponentMounted.current) {
+        console.log('Component unmounted during fetch, aborting update');
+        return;
+      }
       
       if (response.success) {
         setGroups(response.data || []);
@@ -44,28 +91,71 @@ const CurrentGroups = () => {
       }
     } catch (err) {
       console.error("Error fetching groups:", err);
-      setError('Không thể tải danh sách nhóm. Vui lòng thử lại sau.');
+      if (isComponentMounted.current) {
+        setError('Không thể tải danh sách nhóm. Vui lòng thử lại sau.');
+      }
     } finally {
-      setLoading(false);
+      if (isComponentMounted.current) {
+        setLoading(false);
+      }
+      isFetching.current.groups = false;
     }
   };
 
   const getGroupChatUrls = async (groupsList) => {
+    if (!isComponentMounted.current) return;
+    
     try {
       const chatUrlsObj = {};
       
       for (const group of groupsList) {
+        // Skip if component unmounted during processing
+        if (!isComponentMounted.current) {
+          console.log('Component unmounted during chat URL fetching, aborting');
+          return;
+        }
+        
+        // Prevent concurrent fetches for the same group
+        if (isFetching.current.chats[group.id]) {
+          console.log(`Already fetching chat for group ${group.id}, skipping`);
+          continue;
+        }
+        
+        // Throttle API calls - only fetch if it's been at least 10 seconds since last fetch
+        const now = Date.now();
+        if (lastFetchTime.current.chats[group.id] && 
+            now - lastFetchTime.current.chats[group.id] < 10000) {
+          console.log(`Throttling chat fetch for group ${group.id} - last fetch was too recent`);
+          continue;
+        }
+        
         try {
+          // Mark as fetching and update last fetch time
+          isFetching.current.chats[group.id] = true;
+          lastFetchTime.current.chats[group.id] = now;
+          
+          console.log(`Fetching chat for group ${group.id}`);
           const chatResponse = await chatService.getGroupChat(group.id);
+          
+          // Check if component is still mounted
+          if (!isComponentMounted.current) {
+            console.log('Component unmounted during chat fetch, aborting update');
+            return;
+          }
+          
           if (chatResponse.success && chatResponse.data) {
             chatUrlsObj[group.id] = `/unishare/chats/${chatResponse.data.id}`;
           }
         } catch (err) {
           console.error(`Error fetching chat for group ${group.id}:`, err);
+        } finally {
+          isFetching.current.chats[group.id] = false;
         }
       }
       
-      setGroupChatUrls(chatUrlsObj);
+      if (isComponentMounted.current) {
+        setGroupChatUrls(prev => ({...prev, ...chatUrlsObj}));
+      }
     } catch (err) {
       console.error("Error getting group chat URLs:", err);
     }
@@ -79,13 +169,22 @@ const CurrentGroups = () => {
     }
   };
   const confirmLeaveGroup = async () => {
-    if (!groupToLeave) return;
+    if (!groupToLeave || !isComponentMounted.current) return;
     
     try {
       setLeaveLoading(true);
-      setError(''); // Clear any previous errors
+      if (isComponentMounted.current) {
+        setError(''); // Clear any previous errors
+      }
       
+      console.log(`Leaving group ${groupToLeave.id}`);
       const response = await profileService.leaveGroup(groupToLeave.id);
+      
+      // Check if component is still mounted
+      if (!isComponentMounted.current) {
+        console.log('Component unmounted during leave group, aborting update');
+        return;
+      }
       
       if (response.success) {
         // Remove the group from the list
@@ -103,9 +202,13 @@ const CurrentGroups = () => {
       }
     } catch (err) {
       console.error("Exception when leaving group:", err);
-      setError('Có lỗi xảy ra khi rời nhóm. Vui lòng thử lại sau.');
+      if (isComponentMounted.current) {
+        setError('Có lỗi xảy ra khi rời nhóm. Vui lòng thử lại sau.');
+      }
     } finally {
-      setLeaveLoading(false);
+      if (isComponentMounted.current) {
+        setLeaveLoading(false);
+      }
     }
   };
   

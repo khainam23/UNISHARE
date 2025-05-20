@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Row, Col, Card, Form, Button, Spinner, Alert, Badge, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaPaperPlane, FaFile, FaImage, FaUsers, FaUserCircle, FaInfoCircle, FaTimesCircle, FaArrowLeft, FaExclamationTriangle } from 'react-icons/fa';
@@ -21,34 +21,142 @@ const ChatPage = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const messagesEndRef = useRef(null);
+  const isComponentMounted = useRef(true); // Track if component is mounted
+  const pollIntervalRef = useRef(null); // Reference to the polling interval
+  const lastFetchTime = useRef({
+    messages: 0,
+    chat: 0
+  }); // Track last fetch time to prevent excessive API calls
+  const currentChatIdRef = useRef(null); // Track current chatId to prevent unnecessary re-fetching
 
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('ChatPage mounted');
+    isComponentMounted.current = true;
+    
+    return () => {
+      console.log('ChatPage unmounted');
+      isComponentMounted.current = false;
+      
+      // Clear any intervals when component unmounts
+      if (pollIntervalRef.current) {
+        console.log('Clearing poll interval on unmount');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
+  
   // Fetch current user
   useEffect(() => {
     const fetchCurrentUser = async () => {
+      if (!isComponentMounted.current) return;
+      
       try {
         const userData = await authService.getCurrentUser();
-        setCurrentUser(userData);
+        if (isComponentMounted.current) {
+          setCurrentUser(userData);
+        }
       } catch (error) {
         console.error('Error fetching current user:', error);
-        setError('Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.');
+        if (isComponentMounted.current) {
+          setError('Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.');
+        }
       }
     };
 
     fetchCurrentUser();
   }, []);
 
+  // Function to fetch new messages without reloading all data
+  const fetchNewMessages = useCallback(async (force = false) => {
+    if (!chatId || !chat || !isComponentMounted.current) return;
+    
+    // Check if chatId is still the current one we're interested in
+    if (chatId !== currentChatIdRef.current) {
+      console.log('ChatId changed since fetchNewMessages was called, aborting');
+      return;
+    }
+    
+    const now = Date.now();
+    // Only fetch if forced or if it's been more than 30 seconds since last fetch
+    if (!force && now - lastFetchTime.current.messages < 30000) {
+      console.log('Throttling fetchNewMessages - last fetch was too recent');
+      return;
+    }
+    
+    // Update last fetch time
+    lastFetchTime.current.messages = now;
+    console.log('Fetching new messages for chat ID:', chatId);
+    
+    try {
+      // Only fetch messages, not the entire chat
+      const messagesResponse = await chatService.getChatMessages(chatId);
+      
+      // Check if component is still mounted before updating state
+      if (!isComponentMounted.current) {
+        console.log('Component unmounted during fetchNewMessages, aborting update');
+        return;
+      }
+      
+      // Check if chatId is still the current one we're interested in
+      if (chatId !== currentChatIdRef.current) {
+        console.log('ChatId changed during fetchNewMessages, aborting update');
+        return;
+      }
+      
+      if (messagesResponse && (messagesResponse.success === true || messagesResponse.data)) {
+        const messagesData = messagesResponse.data?.data || messagesResponse.data || [];
+        setMessages(messagesData);
+        
+        // Mark chat as read only if component is still mounted and chatId is current
+        if (isComponentMounted.current && chatId === currentChatIdRef.current) {
+          await chatService.markChatAsRead(chatId);
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching new messages:', err);
+      // Don't set error state for background polling
+    }
+  }, [chatId, chat]);
+
   // Fetch chat data and messages
   useEffect(() => {
+    // Skip if chatId is the same as the one we're already tracking
+    if (chatId === currentChatIdRef.current) {
+      console.log('ChatId unchanged, skipping re-fetch:', chatId);
+      return;
+    }
+    
+    console.log('ChatId changed from', currentChatIdRef.current, 'to', chatId);
+    currentChatIdRef.current = chatId;
+    
+    // Clear any existing interval when chatId changes
+    if (pollIntervalRef.current) {
+      console.log('Clearing previous poll interval');
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     const fetchChatData = async () => {
-      if (!chatId) return;
+      if (!chatId || !isComponentMounted.current) return;
       
       try {
         setLoading(true);
         setError('');
         
+        console.log('Fetching chat data for chat ID:', chatId);
         // Fetch chat details
         const chatResponse = await chatService.getChat(chatId);
-        console.log('Chat response:', chatResponse);
+        
+        // Check if component is still mounted before updating state
+        if (!isComponentMounted.current) return;
+        
+        // Check if chatId is still the current one we're interested in
+        if (chatId !== currentChatIdRef.current) {
+          console.log('ChatId changed during fetch, aborting update');
+          return;
+        }
         
         // Check for success property first, then fallback to checking if data exists
         if (chatResponse && (chatResponse.success === true || chatResponse.data)) {
@@ -59,7 +167,15 @@ const ChatPage = () => {
           try {
             // Fetch chat messages
             const messagesResponse = await chatService.getChatMessages(chatId);
-            console.log('Messages response:', messagesResponse);
+            
+            // Check if component is still mounted before updating state
+            if (!isComponentMounted.current) return;
+            
+            // Check if chatId is still the current one we're interested in
+            if (chatId !== currentChatIdRef.current) {
+              console.log('ChatId changed during message fetch, aborting update');
+              return;
+            }
             
             if (messagesResponse && (messagesResponse.success === true || messagesResponse.data)) {
               // Access data correctly based on the response structure
@@ -78,7 +194,9 @@ const ChatPage = () => {
             }
           } catch (messagesError) {
             console.error('Error loading messages:', messagesError);
-            setMessages([]);
+            if (isComponentMounted.current) {
+              setMessages([]);
+            }
             // Don't set error state here to still show chat with empty messages
           }
         } else {
@@ -86,51 +204,152 @@ const ChatPage = () => {
         }
       } catch (err) {
         console.error('Error loading chat:', err);
-        setError(err.message || 'Không thể tải cuộc trò chuyện. Vui lòng thử lại sau.');
+        if (isComponentMounted.current) {
+          setError(err.message || 'Không thể tải cuộc trò chuyện. Vui lòng thử lại sau.');
+        }
       } finally {
-        setLoading(false);
+        if (isComponentMounted.current && chatId === currentChatIdRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchChatData();
     
-    // Poll for new messages every 10 seconds
-    const pollInterval = setInterval(() => {
-      if (chatId && !error) {
-        fetchNewMessages();
+    // Set up polling with a delay to avoid rapid setup/teardown
+    const setupPolling = () => {
+      // Only set up polling if component is mounted, no interval is already set, and chatId is current
+      if (isComponentMounted.current && !pollIntervalRef.current && chatId === currentChatIdRef.current) {
+        console.log('Setting up polling for chat ID:', chatId);
+        pollIntervalRef.current = setInterval(() => {
+          // Only poll if component is mounted and chatId is still current
+          if (isComponentMounted.current && chatId === currentChatIdRef.current) {
+            console.log('Polling for new messages');
+            fetchNewMessages(false); // Pass false to respect throttling
+          } else {
+            // Safety check - clear interval if conditions no longer met
+            console.log('Conditions changed during polling, clearing interval');
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        }, 60000); // 60 seconds
       }
-    }, 10000);
+    };
     
-    return () => clearInterval(pollInterval);
-  }, [chatId]);
+    // Delay polling setup to avoid rapid setup/teardown
+    const pollingDelayTimer = setTimeout(setupPolling, 2000);
+    
+    return () => {
+      // Clean up
+      clearTimeout(pollingDelayTimer);
+      if (pollIntervalRef.current) {
+        console.log('Chat ID changed or component unmounting, cleaning up');
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [chatId, fetchNewMessages]);
+  // Removed 'error' from dependencies to prevent re-running effect when error changes
 
-  // Function to fetch new messages without reloading all data
-  const fetchNewMessages = async () => {
-    if (!chatId || !chat) return;
-    
-    try {
-      // Only fetch messages, not the entire chat
-      const messagesResponse = await chatService.getChatMessages(chatId);
+  // Track if user is near bottom of chat
+  const isNearBottom = useRef(true);
+  const chatBodyRef = useRef(null);
+  const isUserScrolling = useRef(false);
+  const userScrollTimeout = useRef(null);
+  
+  // Check if user is near bottom of chat
+  const checkIfNearBottom = () => {
+    if (chatBodyRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatBodyRef.current;
+      // Consider "near bottom" if within 150px of the bottom
+      const scrollThreshold = 150;
+      const nearBottom = scrollHeight - scrollTop - clientHeight < scrollThreshold;
       
-      if (messagesResponse && (messagesResponse.success === true || messagesResponse.data)) {
-        const messagesData = messagesResponse.data?.data || messagesResponse.data || [];
-        setMessages(messagesData);
-        
-        // Mark chat as read
-        await chatService.markChatAsRead(chatId);
+      console.log('Scroll check:', { 
+        scrollTop, 
+        scrollHeight, 
+        clientHeight, 
+        distance: scrollHeight - scrollTop - clientHeight,
+        nearBottom
+      });
+      
+      isNearBottom.current = nearBottom;
+      
+      // Set user scrolling flag
+      isUserScrolling.current = true;
+      
+      // Clear any existing timeout
+      if (userScrollTimeout.current) {
+        clearTimeout(userScrollTimeout.current);
       }
-    } catch (err) {
-      console.warn('Error fetching new messages:', err);
-      // Don't set error state for background polling
+      
+      // Reset the scrolling flag after 1 second of no scroll events
+      userScrollTimeout.current = setTimeout(() => {
+        isUserScrolling.current = false;
+      }, 1000);
     }
   };
-
-  // Scroll to bottom when messages change
+  
+  // Setup effect for chatBodyRef
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+    // This effect runs after render when chatBodyRef is available
+    const setupScrollListener = () => {
+      if (!chatBodyRef.current) {
+        console.log('chatBodyRef still not available, trying again in 100ms');
+        setTimeout(setupScrollListener, 100);
+        return;
+      }
+      
+      console.log('Setting up scroll listener');
+      const chatBody = chatBodyRef.current;
+      
+      // Initial check
+      checkIfNearBottom();
+      
+      // Add event listener
+      chatBody.addEventListener('scroll', checkIfNearBottom);
+      
+      // Store cleanup function
+      const cleanup = () => {
+        console.log('Removing scroll listener');
+        if (chatBody) {
+          chatBody.removeEventListener('scroll', checkIfNearBottom);
+        }
+      };
+      
+      // Store cleanup function for later
+      return cleanup;
+    };
+    
+    // Initial setup
+    const cleanup = setupScrollListener();
+    
+    // Cleanup function
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
+  }, []);
+  
+  // Scroll to bottom only in specific cases:
+  // 1. Initial load (loading becomes false)
+  // 2. When user sends a new message
+  // 3. When new messages arrive and user was already near bottom
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
+  
+  // Vô hiệu hóa tự động cuộn xuống khi tải tin nhắn ban đầu
+  useEffect(() => {
+    // Không làm gì cả - vô hiệu hóa tự động cuộn khi tải tin nhắn ban đầu
+    console.log('Initial auto-scrolling is disabled');
+  }, [loading, messages.length]);
+  
+  // Vô hiệu hóa tự động cuộn xuống khi tin nhắn thay đổi
+  // Người dùng sẽ phải tự cuộn xuống nếu muốn xem tin nhắn mới
+  useEffect(() => {
+    // Không làm gì cả - vô hiệu hóa tự động cuộn
+    console.log('Auto-scrolling is disabled');
+  }, [shouldScrollToBottom]);
 
   const handleAttachmentChange = (e) => {
     if (e.target.files) {
@@ -181,7 +400,12 @@ const ChatPage = () => {
       if (response.success || response.data) {
         // Add new message to the list
         if (response.data) {
-          setMessages(prevMessages => [response.data, ...prevMessages]);
+          // Thêm tin nhắn mới vào cuối danh sách (tin nhắn mới nhất)
+          setMessages(prevMessages => [...prevMessages, response.data]);
+          
+          // Không tự động cuộn xuống dưới khi gửi tin nhắn
+          // Người dùng sẽ phải tự cuộn xuống nếu muốn xem tin nhắn mới
+          console.log('Message sent, but not auto-scrolling');
         }
         
         // Clear form
@@ -299,7 +523,11 @@ const ChatPage = () => {
                     </Card.Header>
                     
                     {/* Chat Messages */}
-                    <Card.Body className="p-3 overflow-auto" style={{ maxHeight: '60vh', minHeight: '60vh' }}>
+                    <Card.Body 
+                      className="p-3 overflow-auto" 
+                      style={{ maxHeight: '60vh', minHeight: '60vh' }}
+                      ref={chatBodyRef}
+                    >
                       {messages.length === 0 ? (
                         <div className="text-center text-muted p-5">
                           <div className="mb-3">
@@ -312,13 +540,16 @@ const ChatPage = () => {
                           <p>Hãy bắt đầu cuộc trò chuyện bằng cách gửi tin nhắn đầu tiên!</p>
                         </div>
                       ) : (
-                        messages.map((message) => (
-                          <ChatMessage 
-                            key={message.id} 
-                            message={message} 
-                            isOwnMessage={currentUser && message.user_id === currentUser.id}
-                          />
-                        ))
+                        // Sắp xếp tin nhắn từ cũ đến mới dựa trên thời gian tạo
+                        [...messages]
+                          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                          .map((message) => (
+                            <ChatMessage 
+                              key={message.id} 
+                              message={message} 
+                              isOwnMessage={currentUser && message.user_id === currentUser.id}
+                            />
+                          ))
                       )}
                       <div ref={messagesEndRef} />
                     </Card.Body>

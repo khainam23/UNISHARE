@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Table, Dropdown, Spinner, Alert, Pagination } from 'react-bootstrap';
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import { profileService } from '../../services';
@@ -9,17 +9,58 @@ const ParticipationHistory = () => {
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const isComponentMounted = useRef(true);
+  const lastFetchTime = useRef(0);
+  const isFetching = useRef(false);
+
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('ParticipationHistory mounted');
+    isComponentMounted.current = true;
+    
+    return () => {
+      console.log('ParticipationHistory unmounted');
+      isComponentMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
-    fetchHistory(currentPage);
+    if (isComponentMounted.current) {
+      fetchHistory(currentPage);
+    }
   }, [currentPage]);
 
   const fetchHistory = async (page) => {
+    // Prevent concurrent fetches
+    if (isFetching.current) {
+      console.log('Already fetching history, skipping');
+      return;
+    }
+    
+    // Throttle API calls - only fetch if it's been at least 5 seconds since last fetch
+    const now = Date.now();
+    if (now - lastFetchTime.current < 5000) {
+      console.log('Throttling history fetch - last fetch was too recent');
+      return;
+    }
+    
     try {
-      setLoading(true);
-      setError('');
+      isFetching.current = true;
+      lastFetchTime.current = now;
       
+      if (isComponentMounted.current) {
+        setLoading(true);
+        setError('');
+      }
+      
+      console.log('Fetching user history, page:', page);
       const response = await profileService.getUserHistory({ page, per_page: 10 });
+      
+      // Check if component is still mounted before updating state
+      if (!isComponentMounted.current) {
+        console.log('Component unmounted during fetch, aborting update');
+        return;
+      }
       
       if (response.success) {
         setHistory(response.data || []);
@@ -29,9 +70,14 @@ const ParticipationHistory = () => {
       }
     } catch (err) {
       console.error("Error fetching history:", err);
-      setError('Không thể tải lịch sử hoạt động. Vui lòng thử lại sau.');
+      if (isComponentMounted.current) {
+        setError('Không thể tải lịch sử hoạt động. Vui lòng thử lại sau.');
+      }
     } finally {
-      setLoading(false);
+      if (isComponentMounted.current) {
+        setLoading(false);
+      }
+      isFetching.current = false;
     }
   };
 
