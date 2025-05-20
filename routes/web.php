@@ -21,7 +21,19 @@ Route::get('/storage/{path}', function($path) {
         abort(404, 'File not found');
     }
     
+    // Check if this is an image or document
     $mimeType = File::mimeType($fullPath);
+    
+    // For security, only allow specific file types to be accessed directly
+    $allowedMimeTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf', 'image/svg+xml'
+    ];
+    
+    if (!in_array($mimeType, $allowedMimeTypes)) {
+        abort(403, 'File type not allowed for direct access');
+    }
+    
     $contents = File::get($fullPath);
     
     return response($contents, 200)

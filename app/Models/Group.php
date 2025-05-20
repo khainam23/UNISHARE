@@ -36,6 +36,7 @@ class Group extends Model
     protected $casts = [
         'requires_approval' => 'boolean',
         'member_count' => 'integer',
+        'type' => 'string',  // Explicitly cast type to string
     ];
 
     /**

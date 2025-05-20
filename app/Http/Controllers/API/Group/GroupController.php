@@ -122,24 +122,45 @@ class GroupController extends Controller
             }
         }
         
-        // Create the group
-        $group = Group::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'type' => $request->type,
-            'course_code' => $request->course_code,
-            'is_private' => $request->is_private ?? false,
-            'cover_image' => $coverImagePath,
-            'created_by' => $request->user()->id,
-        ]);
+        // Make sure the type is one of the allowed values
+        $type = $request->input('type');
+        if (!in_array($type, ['course', 'university', 'interest'])) {
+            $type = 'course'; // Default to 'course' if invalid type
+        }
         
-        // Add the creator as a member and admin
-        $group->members()->create([
-            'user_id' => $request->user()->id,
-            'role' => 'admin',
-        ]);
+        // Create the group with properly validated values
+        // Check if created_by column exists in the table
+        $hasCreatedByColumn = \Schema::hasColumn('groups', 'created_by');
         
-        return new GroupResource($group);
+        try {
+            $group = new Group();
+            $group->name = $request->input('name');
+            $group->description = $request->input('description');
+            $group->type = $type; // Use the validated type
+            $group->course_code = $request->input('course_code');
+            $group->requires_approval = $request->input('is_private', false);
+            $group->cover_image = $coverImagePath;
+            $group->creator_id = $request->user()->id;
+            
+            // Only set created_by if the column exists
+            if ($hasCreatedByColumn) {
+                $group->created_by = $request->user()->id;
+            }
+            
+            $group->save();
+            
+            // Add the creator as a member and admin
+            $group->members()->attach($request->user()->id, [
+                'role' => 'admin',
+                'status' => 'approved',
+                'joined_at' => now(),
+            ]);
+            
+            return new GroupResource($group);
+        } catch (\Exception $e) {
+            \Log::error('Error creating group: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to create group: ' . $e->getMessage()], 500);
+        }
     }
     
     public function show(Group $group)

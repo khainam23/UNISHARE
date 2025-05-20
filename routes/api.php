@@ -9,6 +9,7 @@ use App\Http\Controllers\API\Chat\AIChatController;
 use App\Http\Controllers\API\Chat\GroupChatController;
 use App\Http\Controllers\API\Document\DocumentController;
 use App\Http\Controllers\API\Group\GroupController;
+use App\Http\Controllers\API\Home\HomeController;
 use App\Http\Controllers\API\Message\ChatController;
 use App\Http\Controllers\API\Message\MessageController;
 use App\Http\Controllers\API\Moderator\ModeratorDocumentController;
@@ -50,6 +51,14 @@ Route::get('/health-check', function () {
         'version' => config('app.version', '1.0.0'),
         'environment' => app()->environment()
     ]);
+});
+
+// Home routes - public access
+Route::prefix('home')->group(function () {
+    Route::get('/popular-courses', [HomeController::class, 'getPopularCourses']);
+    Route::get('/free-documents', [HomeController::class, 'getFreeDocuments']);
+    Route::get('/recent-posts', [HomeController::class, 'getRecentPosts']);
+    Route::get('/stats', [HomeController::class, 'getStats']);
 });
 
 // Authentication Routes

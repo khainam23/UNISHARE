@@ -3,177 +3,120 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\Document;
-use App\Models\FileUpload;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\Document;
 
 class StorageController extends Controller
 {
     /**
-     * Serve a file from storage with authentication check
-     *
-     * @param string $path The file path
-     * @return \Illuminate\Http\Response
+     * Get a file from storage with authentication
      */
-    public function getFile($path)
+    public function getFile(Request $request, $path)
     {
-        // Check authentication
+        // Check if user is authenticated
         if (!Auth::check()) {
-            return response()->json(['message' => 'Unauthorized access'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401);
         }
         
-        // Replace 'private/' with '' to get the actual path
-        $actualPath = str_replace('private/', '', $path);
+        $fullPath = storage_path('app/public/' . $path);
         
-        // Check if it's a document file
-        $fileUpload = FileUpload::where('file_path', $path)
-            ->orWhere('file_path', $actualPath)
-            ->first();
+        if (!File::exists($fullPath)) {
+            return response()->json(['error' => 'File not found'], 404);
+        }
+        
+        // Special case for all public directories
+        $publicDirectories = ['blog', 'courses', 'documents', 'avatars'];
+        $pathParts = explode('/', $path);
+        
+        if (in_array($pathParts[0], $publicDirectories)) {
+            // These directories have public content that any authenticated user can access
+            $mimeType = File::mimeType($fullPath);
+            $contents = File::get($fullPath);
             
-        if ($fileUpload) {
-            // Check if this file is linked to a document that requires authorization
-            $document = Document::whereHas('fileUpload', function($query) use ($fileUpload) {
-                $query->where('id', $fileUpload->id);
-            })->first();
-            
-            if ($document && !$document->is_approved && Auth::id() !== $document->user_id && !Auth::user()->hasRole(['admin', 'moderator'])) {
-                return response()->json(['message' => 'You do not have permission to access this file'], 403);
+            return response($contents, 200)
+                ->header('Content-Type', $mimeType);
+        }
+        
+        // For non-public files, check permissions
+        $documentId = null;
+        
+        // Try to extract document ID from path if it follows a pattern
+        if (count($pathParts) >= 2 && strpos($path, 'uploads/documents/') === 0) {
+            $documentId = intval($pathParts[2]);
+        }
+        
+        if ($documentId) {
+            $document = Document::find($documentId);
+            if ($document && !$this->userCanAccessDocument($request->user(), $document)) {
+                return response()->json(['error' => 'Unauthorized access'], 403);
             }
         }
         
-        // Check if file exists
-        if (!Storage::exists($actualPath) && !Storage::exists($path)) {
-            return response()->json(['message' => 'File not found'], 404);
-        }
+        $mimeType = File::mimeType($fullPath);
+        $contents = File::get($fullPath);
         
-        $filePath = Storage::exists($actualPath) ? $actualPath : $path;
-        
-        // Get file metadata
-        $mimeType = Storage::mimeType($filePath);
-        $size = Storage::size($filePath);
-        $fileName = basename($filePath);
-        
-        // Return the file as a streamed download
-        return new StreamedResponse(function () use ($filePath) {
-            $stream = Storage::readStream($filePath);
-            fpassthru($stream);
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-        }, 200, [
-            'Content-Type' => $mimeType,
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-            'Content-Length' => $size,
-        ]);
-    }
-
-    /**
-     * Preview a file from storage with authentication check
-     *
-     * @param string $path The file path
-     * @return \Illuminate\Http\Response
-     */
-    public function previewFile($path)
-    {
-        // Check authentication
-        if (!Auth::check()) {
-            return response()->json(['message' => 'Unauthorized access'], 401);
-        }
-        
-        // Replace 'private/' with '' to get the actual path
-        $actualPath = str_replace('private/', '', $path);
-        
-        // Check if it's a document file
-        $fileUpload = FileUpload::where('file_path', $path)
-            ->orWhere('file_path', $actualPath)
-            ->first();
-            
-        if ($fileUpload) {
-            // Check if this file is linked to a document that requires authorization
-            $document = Document::whereHas('fileUpload', function($query) use ($fileUpload) {
-                $query->where('id', $fileUpload->id);
-            })->first();
-            
-            if ($document && !$document->is_approved && Auth::id() !== $document->user_id && !Auth::user()->hasRole(['admin', 'moderator'])) {
-                return response()->json(['message' => 'You do not have permission to access this file'], 403);
-            }
-        }
-        
-        // Check if file exists
-        if (!Storage::exists($actualPath) && !Storage::exists($path)) {
-            return response()->json(['message' => 'File not found'], 404);
-        }
-        
-        $filePath = Storage::exists($actualPath) ? $actualPath : $path;
-        
-        // Check if the file is a PDF, image, or other previewable file type
-        $mimeType = Storage::mimeType($filePath);
-        if (!in_array($mimeType, ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
-            return response()->json(['message' => 'File type not supported for preview'], 400);
-        }
-        
-        // Get file metadata
-        $size = Storage::size($filePath);
-        
-        // Return the file for inline display
-        return new StreamedResponse(function () use ($filePath) {
-            $stream = Storage::readStream($filePath);
-            fpassthru($stream);
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-        }, 200, [
-            'Content-Type' => $mimeType,
-            'Content-Disposition' => 'inline',
-            'Content-Length' => $size,
-        ]);
+        return response($contents, 200)
+            ->header('Content-Type', $mimeType);
     }
     
     /**
-     * Check if the current user has access to a file
-     * 
-     * @param string $path The file path
-     * @return bool
+     * Preview a file (typically for documents)
      */
-    private function userHasAccessToFile($path)
+    public function previewFile(Request $request, $path)
     {
-        // Admin and moderators have access to all files
-        if (Auth::user()->hasRole(['admin', 'moderator'])) {
+        $fullPath = storage_path('app/public/' . $path);
+        
+        if (!File::exists($fullPath)) {
+            return response()->json(['error' => 'File not found'], 404);
+        }
+        
+        $mimeType = File::mimeType($fullPath);
+        
+        // For security, we only preview certain file types
+        $previewableMimeTypes = [
+            'application/pdf',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+            'text/plain', 'text/html', 'text/css', 'text/javascript'
+        ];
+        
+        if (!in_array($mimeType, $previewableMimeTypes)) {
+            return response()->json(['error' => 'File type not previewable'], 403);
+        }
+        
+        $contents = File::get($fullPath);
+        
+        return response($contents, 200)
+            ->header('Content-Type', $mimeType);
+    }
+    
+    /**
+     * Check if a user can access a document
+     */
+    private function userCanAccessDocument($user, $document)
+    {
+        // If document is public, anyone can access
+        if ($document->is_public) {
             return true;
         }
         
-        // Check if it's a document file
-        $fileUpload = FileUpload::where('file_path', $path)->first();
-        
-        if (!$fileUpload) {
-            // If not a tracked file, only admins have access (already handled above)
-            return false;
-        }
-        
-        // If the user is the owner of the file, they have access
-        if ($fileUpload->user_id === Auth::id()) {
+        // If user is document owner
+        if ($user->id === $document->user_id) {
             return true;
         }
         
-        // Check if this file is linked to a document
-        $document = Document::whereHas('fileUpload', function($query) use ($fileUpload) {
-            $query->where('id', $fileUpload->id);
-        })->first();
-        
-        if (!$document) {
-            // If not linked to a document, only owner has access (already handled above)
-            return false;
-        }
-        
-        // If the document is approved, everyone has access
-        if ($document->is_approved) {
+        // If user is admin or moderator
+        if ($user->hasRole(['admin', 'moderator'])) {
             return true;
         }
         
-        // Otherwise, only the owner, admin, and moderators have access
-        return $document->user_id === Auth::id();
+        // If document belongs to a group and user is member of that group
+        if ($document->group_id) {
+            return $user->groups()->where('group_id', $document->group_id)->exists();
+        }
+        
+        return false;
     }
 }
