@@ -76,7 +76,6 @@ const EditProfileInfoForm = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -103,7 +102,8 @@ const EditProfileInfoForm = () => {
           navigate('/profile');
         }, 2000);
       } else {
-        throw new Error(response.message || 'Cập nhật thất bại');
+        // Don't throw an error, just set the error message from the response
+        setGeneralError(response.message || 'Cập nhật thất bại');
       }
     } catch (err) {
       console.error("Error updating profile:", err);

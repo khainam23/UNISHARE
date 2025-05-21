@@ -13,18 +13,27 @@ const profileService = {
       throw error.response ? error.response.data : error;
     }
   },
-
   /**
    * Update the user's profile information
    * @param {Object} profileData - User profile data to update
-   * @returns {Promise} Promise with updated user data
+   * @returns {Promise} Promise with updated user data and success status
    */
   updateProfile: async (profileData) => {
     try {
       const response = await api.put('/auth/profile', profileData);
-      return response.data;
+      // Ensure we consistently return a success flag
+      return {
+        success: true,
+        ...response.data
+      };
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      console.error('Error updating profile:', error);
+      // Return a formatted error response instead of throwing
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to update profile',
+        errors: error.response?.data?.errors || {}
+      };
     }
   },
 
