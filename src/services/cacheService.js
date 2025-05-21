@@ -1,123 +1,157 @@
 /**
- * Service for caching API responses
+ * Simple in-memory cache service with localStorage persistence
  */
-class CacheService {
-  constructor() {
-    this.cache = {};
-    this.timestamps = {};
-    this.pendingRequests = {};
-    this.debugMode = true; // Bật chế độ debug để theo dõi cache
-  }
-
+const cacheService = {
+  cache: {},
+  
   /**
-   * Get data from cache
+   * Get a value from cache
    * @param {string} key - Cache key
-   * @param {number} maxAge - Maximum age of cache in milliseconds
-   * @returns {any|null} Cached data or null if not found or expired
+   * @returns {any} Cached value or null if not found or expired
    */
-  get(key, maxAge = 5 * 60 * 1000) {
-    // Kiểm tra xem key có tồn tại trong cache không
-    if (!this.cache[key]) {
-      if (this.debugMode) console.log(`[Cache] MISS: ${key}`);
-      return null;
+  get: (key) => {
+    // Try to get from memory cache first
+    const item = cacheService.cache[key];
+    
+    if (item && item.expiry > Date.now()) {
+      return item.value;
     }
-
-    // Kiểm tra xem cache có hết hạn không
-    const timestamp = this.timestamps[key] || 0;
-    const now = Date.now();
-    if (now - timestamp > maxAge) {
-      // Cache đã hết hạn, xóa và trả về null
-      if (this.debugMode) console.log(`[Cache] EXPIRED: ${key}`);
-      this.remove(key);
-      return null;
+    
+    // If not in memory or expired, try localStorage
+    try {
+      const storedItem = localStorage.getItem(`cache_${key}`);
+      
+      if (storedItem) {
+        const parsedItem = JSON.parse(storedItem);
+        
+        if (parsedItem.expiry > Date.now()) {
+          // Update memory cache
+          cacheService.cache[key] = parsedItem;
+          return parsedItem.value;
+        } else {
+          // Remove expired item
+          localStorage.removeItem(`cache_${key}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error retrieving from cache:', error);
     }
-
-    if (this.debugMode) console.log(`[Cache] HIT: ${key}`);
-    return this.cache[key];
-  }
-
+    
+    return null;
+  },
+  
   /**
-   * Set data in cache
+   * Set a value in cache
    * @param {string} key - Cache key
-   * @param {any} data - Data to cache
+   * @param {any} value - Value to cache
+   * @param {number} ttl - Time to live in milliseconds
    */
-  set(key, data) {
-    if (this.debugMode) console.log(`[Cache] SET: ${key}`);
-    this.cache[key] = data;
-    this.timestamps[key] = Date.now();
-  }
-
+  set: (key, value, ttl = 5 * 60 * 1000) => {
+    const item = {
+      value,
+      expiry: Date.now() + ttl
+    };
+    
+    // Set in memory cache
+    cacheService.cache[key] = item;
+    
+    // Also persist to localStorage if possible
+    try {
+      localStorage.setItem(`cache_${key}`, JSON.stringify(item));
+    } catch (error) {
+      console.error('Error setting cache in localStorage:', error);
+    }
+  },
+  
   /**
-   * Remove data from cache
+   * Remove a value from cache
    * @param {string} key - Cache key
    */
-  remove(key) {
-    if (this.debugMode) console.log(`[Cache] REMOVE: ${key}`);
-    delete this.cache[key];
-    delete this.timestamps[key];
-  }
-
+  remove: (key) => {
+    // Remove from memory cache
+    delete cacheService.cache[key];
+    
+    // Also remove from localStorage
+    try {
+      localStorage.removeItem(`cache_${key}`);
+    } catch (error) {
+      console.error('Error removing from cache:', error);
+    }
+  },
+  
+  /**
+   * Remove all values from cache that match a pattern
+   * @param {string} pattern - Pattern to match against cache keys
+   */
+  removeByPattern: (pattern) => {
+    // Remove from memory cache
+    Object.keys(cacheService.cache).forEach(key => {
+      if (key.includes(pattern)) {
+        delete cacheService.cache[key];
+      }
+    });
+    
+    // Also remove from localStorage
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('cache_') && key.includes(pattern)) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      console.error('Error removing pattern from cache:', error);
+    }
+  },
+  
   /**
    * Clear all cache
    */
-  clear() {
-    if (this.debugMode) console.log(`[Cache] CLEAR ALL`);
-    this.cache = {};
-    this.timestamps = {};
-  }
-
-  /**
-   * Clear cache by prefix
-   * @param {string} prefix - Prefix to match
-   */
-  clearByPrefix(prefix) {
-    if (this.debugMode) console.log(`[Cache] CLEAR PREFIX: ${prefix}`);
-    Object.keys(this.cache).forEach(key => {
-      if (key.startsWith(prefix)) {
-        this.remove(key);
+  clear: () => {
+    // Clear memory cache
+    cacheService.cache = {};
+    
+    // Also clear localStorage cache items
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('cache_')) {
+          keysToRemove.push(key);
+        }
       }
-    });
-  }
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  },
   
   /**
-   * Memoize an async function call to prevent duplicate calls
+   * Memoize a function call with caching
    * @param {string} key - Cache key
-   * @param {Function} asyncFn - Async function to call
-   * @param {number} maxAge - Maximum age of cache in milliseconds
-   * @returns {Promise<any>} Result of the async function
+   * @param {Function} fn - Function to memoize
+   * @param {number} ttl - Time to live in milliseconds
+   * @returns {Promise<any>} Result of the function call
    */
-  async memoize(key, asyncFn, maxAge = 5 * 60 * 1000) {
-    // Kiểm tra cache trước
-    const cachedData = this.get(key, maxAge);
-    if (cachedData) {
-      return cachedData;
+  memoize: async (key, fn, ttl = 5 * 60 * 1000) => {
+    const cachedResult = cacheService.get(key);
+    
+    if (cachedResult !== null) {
+      return cachedResult;
     }
     
-    // Kiểm tra xem có request đang chờ không
-    if (this.pendingRequests[key]) {
-      if (this.debugMode) console.log(`[Cache] PENDING: ${key}`);
-      return this.pendingRequests[key];
-    }
-    
-    // Tạo promise mới và lưu vào pendingRequests
-    if (this.debugMode) console.log(`[Cache] FETCH: ${key}`);
-    this.pendingRequests[key] = asyncFn().then(result => {
-      // Lưu kết quả vào cache
-      this.set(key, result);
-      // Xóa khỏi pendingRequests
-      delete this.pendingRequests[key];
-      return result;
-    }).catch(error => {
-      // Xóa khỏi pendingRequests nếu có lỗi
-      delete this.pendingRequests[key];
-      throw error;
-    });
-    
-    return this.pendingRequests[key];
+    const result = await fn();
+    cacheService.set(key, result, ttl);
+    return result;
   }
-}
-
-// Tạo một instance duy nhất để sử dụng trong toàn bộ ứng dụng
-const cacheService = new CacheService();
+};
 
 export default cacheService;

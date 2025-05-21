@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Image, Button, Badge, Modal, Spinner } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { BsPeopleFill, BsChatDots, BsCalendar3, BsBook, BsDoorOpen } from 'react-icons/bs';
+import { BsPeopleFill, BsChatDots, BsCalendar3, BsBook, BsDoorOpen, BsExclamationTriangle } from 'react-icons/bs';
 import defaultAvatar from '../../assets/avatar-1.png';
-import { profileService } from '../../services';
+import { profileService, groupService } from '../../services';
 import LeaveGroupModal from './LeaveGroupModal';
 
 const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
@@ -12,47 +12,30 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
   const [joiningGroup, setJoiningGroup] = useState(false);
   const [leavingGroup, setLeavingGroup] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [joinRequestPending, setJoinRequestPending] = useState(false);
+  
   // Use a fallback cover style instead of requiring an image file
   const defaultCoverStyle = {
     backgroundColor: '#6c757d',
     backgroundImage: 'linear-gradient(135deg, #8e9eab 0%, #eef2f3 100%)'
   };
 
-  // Double-check membership status from the API
-  const [membershipStatus, setMembershipStatus] = useState({
-    checked: false,
-    isMember: isMember
-  });
-
+  // Check for pending join requests when component mounts
   useEffect(() => {
-    // Set the initial member state from props
-    setMembershipStatus(prev => ({...prev, isMember}));
-    
-    // If the group data is available, verify membership status from the API
-    if (group && group.id) {
-      checkMembershipStatus();
+    if (group && group.id && !isMember) {
+      checkJoinRequestStatus();
     }
   }, [group, isMember]);
 
-  const checkMembershipStatus = async () => {
+  // Check if the user has a pending join request
+  const checkJoinRequestStatus = async () => {
     try {
-      // Get group details including membership info
-      const response = await profileService.getGroupDetails(group.id);
-      
-      if (response.success && response.data) {
-        // Check if the response data contains role information
-        const isMemberFromAPI = response.data.role !== undefined;
-        
-        // Update the membership status based on the API response
-        setMembershipStatus({
-          checked: true,
-          isMember: isMemberFromAPI
-        });
-        
-        console.log('Membership status from API:', isMemberFromAPI, 'Role:', response.data.role);
+      const response = await groupService.checkJoinRequestStatus(group.id);
+      if (response.success && response.data.status === 'pending') {
+        setJoinRequestPending(true);
       }
-    } catch (err) {
-      console.error("Error checking membership status:", err);
+    } catch (error) {
+      console.error("Error checking join request status:", error);
     }
   };
 
@@ -63,17 +46,17 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
       setJoinError('');
       setJoiningGroup(true);
       
-      const response = await profileService.joinGroup(group.id);
+      const response = await groupService.joinGroup(group.id);
       
       if (response.success) {
         setShowJoinModal(false);
         
-        // If the join was successful without a pending request
-        if (response.message && response.message.includes('successfully')) {
+        // If the join was successful without pending
+        if (response.data?.status === 'approved' || (response.message && response.message.includes('successfully'))) {
           if (onJoinGroup) onJoinGroup(true);
-          if (onRefresh) onRefresh();
         } else {
           // A join request was sent (for private groups)
+          setJoinRequestPending(true);
           if (onJoinGroup) onJoinGroup(false, true);
         }
       } else {
@@ -91,39 +74,18 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
     try {
       setLeavingGroup(true);
       
-      // Check if user is authenticated before proceeding
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('User not authenticated');
-        setShowLeaveModal(false);
-        
-        // Redirect to login page if not authenticated
-        window.location.href = '/login';
-        return;
-      }
-      
-      console.log(`Attempting to leave group ${group.id}`);
-      const response = await profileService.leaveGroup(group.id);
+      const response = await groupService.leaveGroup(group.id);
       
       if (response.success) {
         setShowLeaveModal(false);
+        
+        // Notify parent component to refresh
         if (onRefresh) onRefresh();
       } else {
-        // Handle specific error cases
-        if (response.message?.includes('Unauthenticated')) {
-          console.error('Authentication token expired');
-          // Refresh token or redirect to login
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login?expired=true';
-          return;
-        }
-        
         throw new Error(response.message || 'Không thể rời nhóm');
       }
     } catch (err) {
       console.error("Error leaving group:", err);
-      // We could show an error message here if needed
       alert(`Lỗi: ${err.message || 'Không thể rời nhóm'}`);
     } finally {
       setLeavingGroup(false);
@@ -136,16 +98,14 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
 
   return (
     <>
-      <Card className="mb-4 group-header">
+      <Card className="mb-4 group-header shadow-sm">
         <div 
           className="group-cover position-relative"
           style={{
             height: '200px',
             ...(group.cover_image ? 
-              { backgroundImage: `url(${group.cover_image})` } : 
+              { backgroundImage: `url(${group.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : 
               defaultCoverStyle),
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
             borderTopLeftRadius: 'calc(0.375rem - 1px)',
             borderTopRightRadius: 'calc(0.375rem - 1px)'
           }}
@@ -214,15 +174,22 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
               </div>
               
               <div className="d-flex gap-2">
-                {!membershipStatus.isMember ? (
-                  <Button 
-                    variant="primary"
-                    onClick={() => setShowJoinModal(true)}
-                    className="d-inline-flex align-items-center"
-                  >
-                    <BsPeopleFill className="me-1" />
-                    Tham gia nhóm
-                  </Button>
+                {!isMember ? (
+                  joinRequestPending ? (
+                    <Alert variant="info" className="p-2 mb-0 d-flex align-items-center">
+                      <BsExclamationTriangle className="me-2" />
+                      Yêu cầu tham gia đang chờ duyệt
+                    </Alert>
+                  ) : (
+                    <Button 
+                      variant="primary"
+                      onClick={() => setShowJoinModal(true)}
+                      className="d-inline-flex align-items-center"
+                    >
+                      <BsPeopleFill className="me-1" />
+                      Tham gia nhóm
+                    </Button>
+                  )
                 ) : (
                   <>
                     <Button 
@@ -262,41 +229,6 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
       </Card>
       
       {/* Join Group Modal */}
-      <Modal show={showJoinModal} onHide={() => setShowJoinModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Tham gia nhóm</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Bạn muốn tham gia nhóm <strong>{group.name}</strong>?</p>
-          
-          {group.is_private && (
-            <div className="alert alert-info">
-              <strong>Lưu ý:</strong> Đây là nhóm kín. Yêu cầu tham gia của bạn sẽ được gửi đến quản trị viên nhóm để duyệt.
-            </div>
-          )}
-          
-          {joinError && (
-            <div className="alert alert-danger">
-              {joinError}
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowJoinModal(false)} disabled={joiningGroup}>
-            Hủy
-          </Button>
-          <Button variant="primary" onClick={handleJoinGroup} disabled={joiningGroup}>
-            {joiningGroup ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-1" />
-                Đang xử lý...
-              </>
-            ) : group.is_private ? 'Gửi yêu cầu tham gia' : 'Tham gia'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-      
-      {/* Leave Group Modal */}
       <LeaveGroupModal 
         show={showLeaveModal} 
         onHide={() => setShowLeaveModal(false)} 
@@ -304,6 +236,58 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
         groupName={group.name}
         isLoading={leavingGroup}
       />
+      
+      {/* Join Group Modal */}
+      {showJoinModal && (
+        <div className="modal" style={{display: 'block', backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Tham gia nhóm</h5>
+                <button type="button" className="btn-close" onClick={() => setShowJoinModal(false)} disabled={joiningGroup}></button>
+              </div>
+              <div className="modal-body">
+                <p>Bạn muốn tham gia nhóm <strong>{group.name}</strong>?</p>
+                
+                {group.is_private && (
+                  <div className="alert alert-info">
+                    <strong>Lưu ý:</strong> Đây là nhóm kín. Yêu cầu tham gia của bạn sẽ được gửi đến quản trị viên nhóm để duyệt.
+                  </div>
+                )}
+                
+                {joinError && (
+                  <div className="alert alert-danger">
+                    {joinError}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowJoinModal(false)} 
+                  disabled={joiningGroup}
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleJoinGroup} 
+                  disabled={joiningGroup}
+                >
+                  {joiningGroup ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                      Đang xử lý...
+                    </>
+                  ) : group.is_private ? 'Gửi yêu cầu tham gia' : 'Tham gia'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

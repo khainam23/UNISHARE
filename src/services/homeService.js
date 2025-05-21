@@ -64,6 +64,48 @@ const homeService = {
         completions: 12500
       };
     }
+  },
+
+  // Get study groups for the homepage
+  getStudyGroups: async () => {
+    try {
+      const response = await api.get('/home/study-groups');
+      // Process the image paths to ensure they're absolute URLs
+      const groups = response.data.data.map(group => ({
+        ...group,
+        thumbnail: group.thumbnail || '/images/group-placeholder.jpg'
+      }));
+      return groups;
+    } catch (error) {
+      console.error('Error fetching study groups:', error);
+      throw error;
+    }
+  },
+
+  // Search for content across the platform
+  searchContent: async (query, options = {}) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('q', query);
+      
+      if (options.category) {
+        params.append('category', options.category);
+      }
+      
+      if (options.sort) {
+        params.append('sort', options.sort);
+      }
+      
+      if (options.type) {
+        params.append('type', options.type);
+      }
+      
+      const response = await api.get(`/search?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error searching content:', error);
+      throw error;
+    }
   }
 };
 

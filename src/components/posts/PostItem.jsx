@@ -1,231 +1,340 @@
 import React, { useState } from 'react';
-import { Card, Image, Button, Dropdown, Form, Row, Col } from 'react-bootstrap';
+import { Card, Button, Dropdown, Badge, Modal, Form, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { BsThreeDots, BsHeart, BsHeartFill, BsChat, BsShare, BsPinAngle, BsMegaphone } from 'react-icons/bs';
+import { BsThreeDots, BsHeart, BsHeartFill, BsChat, BsPin, BsPinFill, BsPencil, BsTrash } from 'react-icons/bs';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import PostComments from './PostComments';
+import { postService, authService } from '../../services';
 import defaultAvatar from '../../assets/avatar-1.png';
+import PostAttachment from './PostAttachment';
+import DeletePostModal from './DeletePostModal';
 
-const PostItem = ({ post, groupContext = false, onLike, onDelete, onEdit }) => {
+const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
   const [showComments, setShowComments] = useState(false);
-  const [comment, setComment] = useState('');
+  const [isLiked, setIsLiked] = useState(post.is_liked);
+  const [likesCount, setLikesCount] = useState(post.likes_count);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count);
+  const currentUser = authService.getUser();
+  const isPinned = post.is_pinned;
   
-  const handleCommentSubmit = (e) => {
-    e.preventDefault();
-    // Handle comment submission
-    setComment('');
-  };
+  // States for post deletion
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
-  // Helper function to format date without date-fns
-  const formatDateRelative = (dateString) => {
+  // States for post editing
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState(post.title || '');
+  const [editContent, setEditContent] = useState(post.content || '');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const handleToggleLike = async () => {
     try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffTime = Math.abs(now - date);
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-      const diffMinutes = Math.floor(diffTime / (1000 * 60));
+      const newLikeStatus = !isLiked;
       
-      if (diffMinutes < 1) {
-        return 'vừa xong';
-      } else if (diffMinutes < 60) {
-        return `${diffMinutes} phút trước`;
-      } else if (diffHours < 24) {
-        return `${diffHours} giờ trước`;
-      } else if (diffDays < 7) {
-        return `${diffDays} ngày trước`;
+      if (newLikeStatus) {
+        await postService.likePost(post.id);
       } else {
-        // Format as regular date for older posts
-        return date.toLocaleDateString('vi-VN', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
+        await postService.unlikePost(post.id);
       }
-    } catch (e) {
-      console.error('Invalid date:', e);
-      return 'Không rõ';
+      
+      setIsLiked(newLikeStatus);
+      setLikesCount(prevCount => newLikeStatus ? prevCount + 1 : prevCount - 1);
+      
+      if (onLike) {
+        onLike(post.id, newLikeStatus);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
     }
   };
-  
+
+  // Function to handle post deletion
+  const handleDeletePost = async () => {
+    try {
+      setIsDeleting(true);
+      const response = await postService.deletePost(post.id);
+      
+      if (response.success) {
+        setShowDeleteModal(false);
+        if (onDelete) {
+          onDelete(post.id);
+        }
+      } else {
+        console.error('Failed to delete post:', response.message);
+        alert('Failed to delete post: ' + response.message);
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('An error occurred while deleting the post');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Function to handle post editing
+  const handleUpdatePost = async (e) => {
+    e.preventDefault();
+    if (!editContent.trim()) {
+      setEditError('Content cannot be empty');
+      return;
+    }
+    
+    try {
+      setIsEditing(true);
+      setEditError('');
+      
+      const updateData = {
+        title: editTitle.trim(),
+        content: editContent.trim()
+      };
+      
+      const response = await postService.updatePost(post.id, updateData);
+      
+      if (response.success) {
+        setShowEditModal(false);
+        if (onUpdate) {
+          onUpdate(post.id, {
+            ...post,
+            title: updateData.title,
+            content: updateData.content
+          });
+        }
+      } else {
+        setEditError(response.message || 'Failed to update post');
+      }
+    } catch (error) {
+      console.error('Error updating post:', error);
+      setEditError('An error occurred while updating the post');
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleTogglePinned = async () => {
+    try {
+      // Implementation will depend on your API
+      // await postService.togglePinPost(post.id);
+    } catch (error) {
+      console.error('Error toggling pin status:', error);
+    }
+  };
+
+  const handleCommentAdded = () => {
+    setCommentsCount(prevCount => prevCount + 1);
+  };
+
+  const handleCommentDeleted = () => {
+    setCommentsCount(prevCount => Math.max(0, prevCount - 1));
+  };
+
+  const handleViewAttachment = (attachment) => {
+    // Open attachment in a new tab if it has a URL
+    if (attachment.file_url) {
+      window.open(attachment.file_url, '_blank');
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment) => {
+    try {
+      // Use your document service or a direct download method
+      if (attachment.file_url) {
+        // Create the download URL by replacing '/file/' with '/download/' in the URL
+        let downloadUrl = attachment.file_url;
+        
+        // If we have a direct download URL from the API, use it
+        if (attachment.download_url) {
+          downloadUrl = attachment.download_url;
+        } else {
+          // Otherwise modify the existing URL to use the download endpoint
+          downloadUrl = downloadUrl.replace('/storage/file/', '/storage/download/');
+          downloadUrl = downloadUrl.replace('/api/storage/file/', '/api/storage/download/');
+        }
+        
+        window.location.href = downloadUrl;
+      }
+    } catch (error) {
+      console.error('Error downloading attachment:', error);
+    }
+  };
+
   return (
-    <Card className="mb-3 shadow-sm">
-      <Card.Body>
-        {/* Post header with user info */}
-        <div className="d-flex mb-3">
-          <Image 
-            src={post.author?.avatar || defaultAvatar} 
-            roundedCircle 
-            width={40} 
-            height={40} 
-            className="me-2"
-            style={{ objectFit: 'cover' }}
-          />
-          <div className="flex-grow-1">
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <Link to={`/profile/${post.author?.id}`} className="fw-bold text-decoration-none">
-                  {post.author?.name || 'Unknown User'}
-                </Link>
-                {!groupContext && post.group && (
-                  <span className="text-muted">
-                    {' '}posted in{' '}
-                    <Link to={`/groups/${post.group.id}`} className="text-decoration-none">
-                      {post.group.name}
+    <>
+      <Card className={`post-card mb-3 ${isPinned ? 'border-primary' : ''}`}>
+        {isPinned && (
+          <div className="pinned-badge">
+            <Badge bg="primary" className="position-absolute top-0 end-0 m-2">
+              <BsPinFill className="me-1" /> Pinned
+            </Badge>
+          </div>
+        )}
+        
+        <Card.Body>
+          <div className="d-flex mb-3">
+            <img 
+              src={post.author?.avatar || defaultAvatar} 
+              alt="Avatar" 
+              className="rounded-circle me-2" 
+              width="40" 
+              height="40"
+              style={{ objectFit: 'cover' }}
+            />
+            <div className="flex-grow-1">
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 className="mb-0">
+                    <Link to={`/profile/${post.author?.id}`} className="text-decoration-none">
+                      {post.author?.name || 'Unknown User'}
                     </Link>
-                  </span>
+                  </h6>
+                  <small className="text-muted">
+                    {post.created_at ? 
+                      formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: vi }) :
+                      'Just now'
+                    }
+                    {groupContext && post.group && (
+                      <> · in <Link to={`/unishare/groups/${post.group.id}`} className="text-decoration-none">{post.group.name}</Link></>
+                    )}
+                  </small>
+                </div>
+                
+                {(post.can_edit || post.can_delete) && (
+                  <Dropdown align="end">
+                    <Dropdown.Toggle variant="link" className="p-0 text-dark no-arrow" id={`post-options-${post.id}`}>
+                      <BsThreeDots />
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      {post.can_edit && (
+                        <Dropdown.Item onClick={() => setShowEditModal(true)}>
+                          <BsPencil className="me-2" /> Edit Post
+                        </Dropdown.Item>
+                      )}
+                      {post.can_delete && (
+                        <Dropdown.Item onClick={() => setShowDeleteModal(true)} className="text-danger">
+                          <BsTrash className="me-2" /> Delete Post
+                        </Dropdown.Item>
+                      )}
+                      {(currentUser?.roles?.includes('admin') || currentUser?.roles?.includes('moderator')) && (
+                        <Dropdown.Item onClick={handleTogglePinned}>
+                          {isPinned ? 'Unpin Post' : 'Pin Post'}
+                        </Dropdown.Item>
+                      )}
+                    </Dropdown.Menu>
+                  </Dropdown>
                 )}
-                <div className="text-muted small">
-                  {formatDateRelative(post.created_at)}
-                  {post.is_pinned && (
-                    <span className="ms-2 text-primary">
-                      <BsPinAngle /> Pinned
-                    </span>
-                  )}
-                  {post.is_announcement && (
-                    <span className="ms-2 text-danger">
-                      <BsMegaphone /> Announcement
-                    </span>
-                  )}
-                </div>
               </div>
-              
-              {/* Post actions dropdown */}
-              <Dropdown>
-                <Dropdown.Toggle as="div" className="btn btn-sm bg-transparent border-0">
-                  <BsThreeDots />
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  {onEdit && <Dropdown.Item onClick={() => onEdit(post)}>Edit</Dropdown.Item>}
-                  {onDelete && <Dropdown.Item onClick={() => onDelete(post)}>Delete</Dropdown.Item>}
-                  <Dropdown.Item>Report</Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
             </div>
           </div>
-        </div>
-        
-        {/* Post title */}
-        {post.title && (
-          <h5 className="mb-2">{post.title}</h5>
-        )}
-        
-        {/* Post content */}
-        <Card.Text className="mb-3 post-content">
-          {post.content}
-        </Card.Text>
-        
-        {/* Post attachments */}
-        {post.attachments && post.attachments.length > 0 && (
-          <div className="post-attachments mb-3">
-            <Row xs={2} md={3} lg={4} className="g-2">
-              {post.attachments.map((attachment, index) => (
-                <Col key={index}>
-                  {attachment.file_type?.startsWith('image/') ? (
-                    <a 
-                      href={attachment.preview_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="d-block"
-                    >
-                      <img 
-                        src={attachment.preview_url || attachment.thumbnail_path} 
-                        alt={attachment.file_name}
-                        className="img-thumbnail w-100"
-                        style={{ height: '150px', objectFit: 'cover' }}
-                      />
-                    </a>
-                  ) : (
-                    <a 
-                      href={attachment.download_url} 
-                      className="attachment-item p-2 border rounded d-flex align-items-center text-decoration-none"
-                    >
-                      <i className="bi bi-file-earmark me-2"></i>
-                      <div className="text-truncate">{attachment.file_name}</div>
-                    </a>
-                  )}
-                </Col>
+          
+          {post.title && <h5 className="card-title mb-2">{post.title}</h5>}
+          
+          <Card.Text className="mb-3" style={{ whiteSpace: 'pre-wrap' }}>
+            {post.content}
+          </Card.Text>
+          
+          {/* Display attachments if any */}
+          {post.attachments && post.attachments.length > 0 && (
+            <div className="post-attachments mb-3">
+              {post.attachments.map(attachment => (
+                <PostAttachment 
+                  key={attachment.id} 
+                  attachment={attachment}
+                  onView={handleViewAttachment}
+                  onDownload={handleDownloadAttachment}
+                />
               ))}
-            </Row>
-          </div>
-        )}
-        
-        {/* Post stats */}
-        <div className="d-flex justify-content-between text-muted mb-2">
-          <div>
-            {post.like_count > 0 && (
-              <span>
-                <BsHeartFill className="text-danger" /> {post.like_count}
-              </span>
-            )}
-          </div>
-          <div>
-            {post.comment_count > 0 && (
-              <span className="cursor-pointer" onClick={() => setShowComments(!showComments)}>
-                {post.comment_count} comments
-              </span>
-            )}
-          </div>
-        </div>
-        
-        {/* Post actions */}
-        <div className="d-flex border-top border-bottom py-2 mb-3">
-          <Button 
-            variant="light" 
-            className="flex-grow-1 d-flex align-items-center justify-content-center"
-            onClick={() => onLike && onLike(post)}
-          >
-            {post.is_liked ? <BsHeartFill className="text-danger me-2" /> : <BsHeart className="me-2" />}
-            Like
-          </Button>
-          <Button 
-            variant="light" 
-            className="flex-grow-1 d-flex align-items-center justify-content-center"
-            onClick={() => setShowComments(!showComments)}
-          >
-            <BsChat className="me-2" />
-            Comment
-          </Button>
-          <Button 
-            variant="light" 
-            className="flex-grow-1 d-flex align-items-center justify-content-center"
-          >
-            <BsShare className="me-2" />
-            Share
-          </Button>
-        </div>
-        
-        {/* Comment form */}
-        {showComments && (
-          <div className="comment-section">
-            <Form onSubmit={handleCommentSubmit} className="d-flex mb-3">
-              <Image 
-                src={defaultAvatar} 
-                roundedCircle 
-                width={32} 
-                height={32} 
-                className="me-2"
-              />
-              <Form.Control
-                type="text"
-                placeholder="Write a comment..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="rounded-pill"
-              />
-            </Form>
-            
-            {/* Comments would be rendered here */}
-            <div className="comments-container">
-              {/* Show a placeholder if there are no comments yet */}
-              {!post.comment_count && (
-                <div className="text-center text-muted my-3">
-                  <p>Be the first to comment</p>
-                </div>
-              )}
+            </div>
+          )}
+          
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <div className="d-flex gap-3">
+              <Button 
+                variant="link" 
+                className={`p-0 text-decoration-none ${isLiked ? 'text-danger' : 'text-muted'}`}
+                onClick={handleToggleLike}
+              >
+                {isLiked ? <BsHeartFill className="me-1" /> : <BsHeart className="me-1" />}
+                {likesCount > 0 && likesCount}
+              </Button>
+              <Button 
+                variant="link" 
+                className="p-0 text-decoration-none text-muted"
+                onClick={() => setShowComments(!showComments)}
+              >
+                <BsChat className="me-1" />
+                {commentsCount > 0 && commentsCount}
+              </Button>
             </div>
           </div>
+        </Card.Body>
+        
+        {showComments && (
+          <Card.Footer className="bg-white border-top-0 pt-0">
+            <PostComments 
+              postId={post.id} 
+              onCommentAdded={handleCommentAdded}
+              onCommentDeleted={handleCommentDeleted}
+            />
+          </Card.Footer>
         )}
-      </Card.Body>
-    </Card>
+      </Card>
+
+      {/* Delete Post Modal */}
+      <DeletePostModal 
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        onConfirm={handleDeletePost}
+        isLoading={isDeleting}
+      />
+
+      {/* Edit Post Modal */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Post</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleUpdatePost}>
+            {editError && <div className="alert alert-danger">{editError}</div>}
+            <Form.Group className="mb-3">
+              <Form.Label>Title (Optional)</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={editTitle} 
+                onChange={(e) => setEditTitle(e.target.value)} 
+                placeholder="Post Title"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Content</Form.Label>
+              <Form.Control 
+                as="textarea" 
+                rows={5} 
+                value={editContent} 
+                onChange={(e) => setEditContent(e.target.value)} 
+                placeholder="Post Content"
+                required
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end">
+              <Button variant="secondary" onClick={() => setShowEditModal(false)} className="me-2" disabled={isEditing}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" disabled={isEditing}>
+                {isEditing ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-1" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+    </>
   );
 };
 

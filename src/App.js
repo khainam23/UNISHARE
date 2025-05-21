@@ -14,6 +14,7 @@ import DocumentView from './pages/DocumentView';
 import EditDocument from './pages/EditDocument';
 import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
+import SearchResultsPage from './pages/SearchResultsPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
@@ -76,6 +77,9 @@ function App() {
       <main className="flex-grow-1">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          
+          {/* Search results page */}
+          <Route path="/search" element={<SearchResultsPage />} />
           
           <Route path="/profile" element={
             <ProtectedRoute>

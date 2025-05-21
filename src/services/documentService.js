@@ -36,13 +36,31 @@ const documentService = {
    */
   getGroupDocuments: async (groupId, params = {}) => {
     try {
+      // Only cache if not searching and on first page
+      const shouldCache = !params.search && (!params.page || params.page === 1);
+      const cacheKey = `group_docs_${groupId}_${JSON.stringify(params)}`;
+      
+      if (shouldCache) {
+        const cachedData = cacheService.get(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
+      }
+      
       const response = await apiRequestWithRetry('get', `/groups/${groupId}/documents`, null, { params });
       
-      return {
+      const result = {
         success: true,
         data: response.data.data || response.data,
         meta: response.data.meta || {}
       };
+      
+      // Cache for 60 seconds if appropriate
+      if (shouldCache) {
+        cacheService.set(cacheKey, result, 60 * 1000);
+      }
+      
+      return result;
     } catch (error) {
       console.error(`Error fetching documents for group ${groupId}:`, error);
       return { 
@@ -64,6 +82,27 @@ const documentService = {
       return response.data;
     } catch (error) {
       throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get document details including access rights
+   * @param {Number} documentId - The ID of the document
+   * @returns {Promise} Promise with document details
+   */
+  getDocumentWithAccess: async (documentId) => {
+    try {
+      const response = await api.get(`/documents/${documentId}`);
+      return {
+        success: true,
+        data: response.data.data || response.data
+      };
+    } catch (error) {
+      console.error(`Error fetching document ${documentId}:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch document details'
+      };
     }
   },
 
@@ -117,10 +156,15 @@ const documentService = {
    */
   uploadGroupDocument: async (groupId, formData) => {
     try {
+      // Clear any cached documents for this group to ensure fresh data after upload
+      cacheService.removeByPattern(`group_docs_${groupId}`);
+      
       const response = await apiRequestWithRetry('post', `/groups/${groupId}/documents`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        // Increase timeout for large uploads
+        timeout: 60000 // 60 seconds
       });
       
       return {
@@ -130,6 +174,24 @@ const documentService = {
       };
     } catch (error) {
       console.error('Error uploading document:', error);
+      
+      // Check for specific error types
+      if (error.message && error.message.includes('timeout')) {
+        return {
+          success: false,
+          message: 'Upload timed out. The file may be too large or your connection too slow.',
+          errors: {}
+        };
+      }
+      
+      if (error.response?.status === 413) {
+        return {
+          success: false,
+          message: 'The file is too large to upload.',
+          errors: {}
+        };
+      }
+      
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to upload document',

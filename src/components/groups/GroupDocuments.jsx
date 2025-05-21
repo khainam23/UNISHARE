@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Row, Col, Spinner, Alert, Pagination, Form, InputGroup } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { BsSearch, BsUpload, BsFileEarmark, BsDownload, BsEye } from 'react-icons/bs';
+import { Link, useNavigate } from 'react-router-dom';
+import { BsSearch, BsUpload, BsFileEarmark, BsDownload, BsEye, BsFilter } from 'react-icons/bs';
 import { documentService } from '../../services';
 
-const GroupDocuments = ({ groupId, userRole }) => {
+const GroupDocuments = ({ groupId, isMember }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,26 +12,27 @@ const GroupDocuments = ({ groupId, userRole }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDocuments(currentPage, searchTerm);
-  }, [groupId, currentPage]);
+  }, [groupId, currentPage, sortBy, sortDirection]);
 
   useEffect(() => {
-    // Clear any existing timeout
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
     
-    // Set a new timeout to delay the search
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page on search
+      setCurrentPage(1);
       fetchDocuments(1, searchTerm);
     }, 500);
     
     setSearchTimeout(timeoutId);
     
-    // Clean up the timeout when the component unmounts or searchTerm changes
     return () => {
       if (searchTimeout) {
         clearTimeout(searchTimeout);
@@ -44,17 +45,13 @@ const GroupDocuments = ({ groupId, userRole }) => {
       setLoading(true);
       setError('');
       
-      // Log the request for debugging
-      console.log(`Fetching documents for group ${groupId}, page ${page}, search: '${search}'`);
-      
       const response = await documentService.getGroupDocuments(groupId, { 
         page, 
         per_page: 10,
-        search
+        search,
+        sort_by: sortBy,
+        sort_direction: sortDirection
       });
-      
-      // Log the response for debugging
-      console.log('Group documents response:', response);
       
       if (response.success) {
         setDocuments(response.data || []);
@@ -72,10 +69,22 @@ const GroupDocuments = ({ groupId, userRole }) => {
 
   const handleDownload = async (documentId) => {
     try {
+      setError('');
       await documentService.downloadDocument(documentId);
     } catch (error) {
       console.error("Error downloading document:", error);
       setError('Không thể tải xuống tài liệu. Vui lòng thử lại sau.');
+    }
+  };
+
+  const changeSorting = (field) => {
+    if (sortBy === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to desc
+      setSortBy(field);
+      setSortDirection('desc');
     }
   };
 
@@ -140,6 +149,18 @@ const GroupDocuments = ({ groupId, userRole }) => {
     );
   };
 
+  const getFileIcon = (fileType) => {
+    // Return appropriate icon based on file type
+    return <BsFileEarmark className="text-primary" />;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return 'Unknown size';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
   if (loading && documents.length === 0) {
     return <div className="text-center py-4"><Spinner animation="border" /></div>;
   }
@@ -152,35 +173,68 @@ const GroupDocuments = ({ groupId, userRole }) => {
         <Card.Body>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h5 className="mb-0">Tài liệu nhóm</h5>
-            {(userRole === 'admin' || userRole === 'moderator') && (
+            {isMember && (
               <Button
                 variant="primary"
                 size="sm"
-                as={Link}
-                to={`/unishare/groups/${groupId}/upload`}
+                onClick={() => navigate(`/unishare/groups/${groupId}/documents/upload`)}
                 className="d-flex align-items-center"
               >
-                <BsUpload className="me-1" /> Tải lên tài liệu mới
+                <BsUpload className="me-1" /> Tải lên tài liệu
               </Button>
             )}
           </div>
           
-          <Form>
-            <InputGroup className="mb-3">
-              <InputGroup.Text id="search-addon">
-                <BsSearch />
-              </InputGroup.Text>
+          <div className="mb-3">
+            <InputGroup>
               <Form.Control
                 placeholder="Tìm kiếm tài liệu..."
-                aria-label="Tìm kiếm tài liệu"
-                aria-describedby="search-addon"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <Button 
+                variant="outline-secondary"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <BsFilter /> Lọc
+              </Button>
             </InputGroup>
-          </Form>
+          </div>
           
-          {loading && (
+          {showFilters && (
+            <div className="mb-3 p-3 border rounded bg-light">
+              <Row>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Sắp xếp theo</Form.Label>
+                    <Form.Select 
+                      value={sortBy}
+                      onChange={(e) => changeSorting(e.target.value)}
+                    >
+                      <option value="created_at">Ngày tạo</option>
+                      <option value="title">Tiêu đề</option>
+                      <option value="file_size">Kích thước</option>
+                      <option value="download_count">Lượt tải</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Thứ tự</Form.Label>
+                    <Form.Select
+                      value={sortDirection}
+                      onChange={(e) => setSortDirection(e.target.value)}
+                    >
+                      <option value="desc">Giảm dần</option>
+                      <option value="asc">Tăng dần</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </div>
+          )}
+          
+          {loading && documents.length > 0 && (
             <div className="text-center py-2 mb-3"><Spinner animation="border" size="sm" /></div>
           )}
           
@@ -196,16 +250,17 @@ const GroupDocuments = ({ groupId, userRole }) => {
                     <Card.Body>
                       <div className="d-flex align-items-start">
                         <div className="document-icon me-3">
-                          <BsFileEarmark size={32} className="text-primary" />
+                          {getFileIcon(document.file_type)}
                         </div>
                         <div className="flex-grow-1">
                           <Card.Title as="h6" className="mb-1">
-                            <Link to={`/unishare-files/view/${document.id}`} className="text-decoration-none">
+                            <Link to={`/unishare/documents/view/${document.id}`} className="text-decoration-none">
                               {document.title}
                             </Link>
                           </Card.Title>
                           <Card.Text className="text-muted small mb-1">
-                            {document.file_type?.toUpperCase()} • {document.file_size ? `${(document.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}
+                            {document.file_type?.toUpperCase()} • {formatFileSize(document.file_size)}
+                            {document.download_count > 0 && ` • ${document.download_count} downloads`}
                           </Card.Text>
                           <Card.Text className="text-muted small">
                             Đăng bởi: {document.user?.name || 'Unknown'} • {new Date(document.created_at).toLocaleDateString('vi-VN')}
@@ -222,7 +277,7 @@ const GroupDocuments = ({ groupId, userRole }) => {
                           </Button>
                           <Button
                             as={Link}
-                            to={`/unishare-files/view/${document.id}`}
+                            to={`/unishare/documents/view/${document.id}`}
                             variant="outline-secondary"
                             size="sm"
                           >

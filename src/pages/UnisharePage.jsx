@@ -70,8 +70,25 @@ const UnisharePage = () => {
       
       // Xử lý kết quả featuredGroups
       let featuredGroups = [];
-      if (featuredGroupsResult.status === 'fulfilled' && featuredGroupsResult.value.success) {
-        featuredGroups = featuredGroupsResult.value.data || [];
+      if (featuredGroupsResult.status === 'fulfilled') {
+        console.log('Featured groups response:', featuredGroupsResult.value);
+        
+        if (featuredGroupsResult.value.success) {
+          featuredGroups = featuredGroupsResult.value.data || [];
+        } else if (featuredGroupsResult.value.data) {
+          // Direct API response format
+          featuredGroups = featuredGroupsResult.value.data || [];
+        } else if (Array.isArray(featuredGroupsResult.value)) {
+          // Handle array response format
+          featuredGroups = featuredGroupsResult.value;
+        }
+        
+        // Ensure we have all needed properties for each group
+        featuredGroups = featuredGroups.map(group => ({
+          ...group,
+          // Make sure member_count is a number 
+          member_count: typeof group.member_count === 'number' ? group.member_count : parseInt(group.member_count) || 0
+        }));
       } else if (featuredGroupsResult.status === 'rejected') {
         console.error('Error fetching featured groups:', featuredGroupsResult.reason);
       }
@@ -98,6 +115,9 @@ const UnisharePage = () => {
         myGroups,
         chats
       });
+      
+      // Log to verify data
+      console.log('Loaded featured groups:', featuredGroups);
       
       // Cập nhật thời gian tải dữ liệu
       setLastDataFetch(now);
@@ -202,7 +222,7 @@ const UnisharePage = () => {
           <>
             <UnishareWelcomeBanner />
             <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Nhóm học tiêu biểu</h5>
+              <h5 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Nhóm học phổ biến</h5>
               <Button
                 as={Link}
                 to="/unishare/create-course"

@@ -6,6 +6,7 @@ import adminService from './adminService';
 import chatService from './chatService';
 import groupService from './groupService';
 import cacheService from './cacheService';
+import postService from './postService';
 import api, { getCsrfToken, checkApiAvailability, apiRequestWithRetry } from './api';
 
 export {
@@ -16,6 +17,7 @@ export {
   chatService,
   groupService,
   cacheService,
+  postService,
   api,
   getCsrfToken,
   checkApiAvailability,
