@@ -16,12 +16,15 @@ class StorageController extends Controller
 {
     /**
      * Get a file from storage with authentication
-     */
-    public function getFile(Request $request, $path)
+     */    public function getFile(Request $request, $path)
     {
-        // Check if user is authenticated
-        if (!Auth::check()) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+        // Check if user is authenticated through session or token in URL
+        // This allows direct file access with a token
+        if (!Auth::check() && !$this->validateRequestToken($request)) {
+            return response()->json([
+                'error' => 'Unauthenticated', 
+                'message' => 'You must be logged in to access this file'
+            ], 401);
         }
         
         // Normalize the path by removing any leading slashes
@@ -129,12 +132,15 @@ class StorageController extends Controller
     
     /**
      * Download a file with proper Content-Disposition header
-     */
-    public function downloadFile(Request $request, $path)
+     */    public function downloadFile(Request $request, $path)
     {
-        // Check if user is authenticated
-        if (!Auth::check()) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+        // Check if user is authenticated through session or token in URL
+        // This allows direct file access with a token
+        if (!Auth::check() && !$this->validateRequestToken($request)) {
+            return response()->json([
+                'error' => 'Unauthenticated', 
+                'message' => 'You must be logged in to download this file'
+            ], 401);
         }
         
         // Normalize the path
@@ -346,7 +352,37 @@ class StorageController extends Controller
     
     /**
      * Increment download count for documents
+     */    /**
+     * Validate a token passed in the request query string
+     * 
+     * @param Request $request
+     * @return bool
      */
+    private function validateRequestToken(Request $request)
+    {
+        $token = $request->query('token');
+        
+        if (!$token) {
+            return false;
+        }
+        
+        // Find the token in the database
+        $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        
+        if (!$personalAccessToken) {
+            return false;
+        }
+        
+        // Get the user associated with the token and auth them
+        $user = $personalAccessToken->tokenable;
+        if ($user) {
+            Auth::login($user);
+            return true;
+        }
+        
+        return false;
+    }
+
     private function incrementDownloadCount($path)
     {
         // Normalize path

@@ -171,9 +171,10 @@ class Document extends Model
     /**
      * Get the download URL for the document
      *
+     * @param bool $includeToken Whether to include an authentication token in the URL
      * @return string
      */
-    public function getDownloadUrlAttribute()
+    public function getDownloadUrlAttribute($includeToken = false)
     {
         // Remove 'private/' prefix if present for API URL
         $path = $this->file_path;
@@ -181,15 +182,34 @@ class Document extends Model
             $path = substr($path, 8);
         }
         
-        return url('/api/storage/download/' . $path);
+        $url = url('/api/storage/download/' . $path);
+        
+        // Add authentication token if requested and user is logged in
+        if ($includeToken && auth()->check()) {
+            $token = auth()->user()->createToken('file-access')->plainTextToken;
+            $url .= '?token=' . $token;
+        }
+        
+        return $url;
+    }
+    
+    /**
+     * Get a download URL with authentication token
+     *
+     * @return string
+     */
+    public function getTokenizedDownloadUrl()
+    {
+        return $this->getDownloadUrlAttribute(true);
     }
     
     /**
      * Get the view URL for the document
      *
+     * @param bool $includeToken Whether to include an authentication token in the URL
      * @return string
      */
-    public function getViewUrlAttribute()
+    public function getViewUrlAttribute($includeToken = false)
     {
         // Remove 'private/' prefix if present for API URL
         $path = $this->file_path;
@@ -197,7 +217,25 @@ class Document extends Model
             $path = substr($path, 8);
         }
         
-        return url('/api/storage/file/' . $path);
+        $url = url('/api/storage/file/' . $path);
+        
+        // Add authentication token if requested and user is logged in
+        if ($includeToken && auth()->check()) {
+            $token = auth()->user()->createToken('file-access')->plainTextToken;
+            $url .= '?token=' . $token;
+        }
+        
+        return $url;
+    }
+    
+    /**
+     * Get a view URL with authentication token
+     *
+     * @return string
+     */
+    public function getTokenizedViewUrl()
+    {
+        return $this->getViewUrlAttribute(true);
     }
 
     /**

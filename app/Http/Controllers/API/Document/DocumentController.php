@@ -544,12 +544,19 @@ class DocumentController extends Controller
                     ], 404);
                 }
                 
+                // Create a token for file access (for direct links)
+                $token = null;
+                if (auth()->check()) {
+                    $token = auth()->user()->createToken('file-access')->plainTextToken;
+                }
+                
                 return response()->json([
                     'filename' => $document->file_name,
                     'file_type' => $document->file_type,
                     'file_size' => $document->file_size,
                     'direct_download' => true,
-                    'download_url' => url('/api/storage/file/' . $fileUpload->file_path)
+                    'download_url' => url('/api/storage/download/' . $fileUpload->file_path) . ($token ? '?token=' . $token : ''),
+                    'view_url' => url('/api/storage/file/' . $fileUpload->file_path) . ($token ? '?token=' . $token : '')
                 ]);
         }
         

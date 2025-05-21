@@ -8,6 +8,24 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Define a login route to prevent "Route [login] not defined" errors
+Route::get('/login', function () {
+    // Check if the request has a redirect parameter
+    $redirectTo = request()->query('redirect_to');
+    
+    // If it's an API request looking for JSON, return JSON response
+    if (request()->expectsJson() || request()->header('Accept') == 'application/json') {
+        return response()->json([
+            'message' => 'Unauthenticated',
+            'login_url' => url('/login'),
+            'redirect_to' => $redirectTo,
+        ], 401);
+    }
+    
+    // For web requests, return the login view or redirect to frontend login page
+    return redirect('/#/login' . ($redirectTo ? '?redirect_to=' . urlencode($redirectTo) : ''));
+})->name('login');
+
 // Make sure Sanctum routes are registered
 Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
