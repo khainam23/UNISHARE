@@ -101,11 +101,11 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
 
   return (
     <>
-      <Card className="mb-4 group-header shadow-sm">
+      <Card className="mb-4 group-header shadow">
         <div 
           className="group-cover position-relative"
           style={{
-            height: '200px',
+            height: '250px',
             ...(group.cover_image ? 
               { backgroundImage: `url(${group.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : 
               defaultCoverStyle),
@@ -117,121 +117,241 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
             <Button
               variant="light"
               size="sm"
-              className="position-absolute top-0 end-0 m-2"
+              className="position-absolute top-0 end-0 m-3 edit-group-btn"
               as={Link}
               to={`/unishare/groups/${group.id}/edit`}
             >
-              Chỉnh sửa nhóm
+              <i className="fas fa-edit me-1"></i> Chỉnh sửa nhóm
             </Button>
           )}
+          
+          <div className="group-cover-overlay"></div>
+          
+          <div className="position-absolute bottom-0 start-0 p-4 text-white z-index-1">
+            <Badge 
+              bg={group.is_private ? 'secondary' : 'success'}
+              className="mb-2 group-privacy-badge"
+            >
+              {group.is_private ? 'Nhóm kín' : 'Nhóm công khai'}
+            </Badge>
+            
+            {group.type === 'course' ? (
+              <Badge bg="primary" className="ms-2 mb-2 group-type-badge">Khóa học</Badge>
+            ) : group.type === 'university' ? (
+              <Badge bg="info" className="ms-2 mb-2 group-type-badge">Trường đại học</Badge>
+            ) : (
+              <Badge bg="secondary" className="ms-2 mb-2 group-type-badge">Sở thích</Badge>
+            )}
+          </div>
         </div>
         
-        <Card.Body>
+        <Card.Body className="p-4">
           <Row>
-            <Col md={8} className="d-flex flex-column mb-3">
-              <div className="d-flex align-items-center mb-2">
-                <h3 className="mb-0 me-2">{group.name}</h3>
-                <Badge 
-                  bg={group.is_private ? 'secondary' : 'success'}
-                  className="d-inline-block ms-2"
-                >
-                  {group.is_private ? 'Nhóm kín' : 'Nhóm công khai'}
-                </Badge>
+            <Col lg={8} className="d-flex flex-column mb-3">
+              <div className="d-flex align-items-center mb-3">
+                <h2 className="group-title mb-0 me-2">{group.name}</h2>
               </div>
               
-              <div className="d-flex align-items-center mb-2 text-muted">
-                <BsPeopleFill className="me-2" />
-                <span className="me-3">{group.member_count || 0} thành viên</span>
+              <div className="d-flex align-items-center mb-3 group-stats">
+                <div className="d-flex align-items-center me-4">
+                  <div className="stats-icon-circle bg-primary bg-opacity-10 me-2">
+                    <BsPeopleFill className="text-primary" />
+                  </div>
+                  <span>{group.member_count || 0} thành viên</span>
+                </div>
                 
                 {group.type === 'course' && (
-                  <>
-                    <BsBook className="me-2 ms-3" />
+                  <div className="d-flex align-items-center">
+                    <div className="stats-icon-circle bg-info bg-opacity-10 me-2">
+                      <BsBook className="text-info" />
+                    </div>
                     <span>{group.course_code || 'Không có mã môn học'}</span>
-                  </>
+                  </div>
                 )}
               </div>
               
-              <div className="group-description my-2">
-                {group.description || 'Không có mô tả'}
+              <div className="group-description my-3 p-3">
+                <h5 className="description-title mb-2">Giới thiệu nhóm</h5>
+                <p className="mb-0">{group.description || 'Không có mô tả'}</p>
               </div>
               
               {group.created_at && (
-                <div className="text-muted mt-auto">
-                  <small>
-                    <BsCalendar3 className="me-1" /> 
-                    Tạo: {new Date(group.created_at).toLocaleDateString('vi-VN')}
-                  </small>
+                <div className="text-muted mt-auto d-flex align-items-center">
+                  <div className="stats-icon-circle bg-secondary bg-opacity-10 me-2">
+                    <BsCalendar3 className="text-secondary" />
+                  </div>
+                  <span>Ngày tạo: {new Date(group.created_at).toLocaleDateString('vi-VN')}</span>
                 </div>
               )}
             </Col>
             
-            <Col md={4} className="d-flex flex-column align-items-end justify-content-between">
-              <div className="mb-3 text-md-end">
-                {group.type === 'course' ? (
-                  <Badge bg="primary" className="me-1">Khóa học</Badge>
-                ) : group.type === 'university' ? (
-                  <Badge bg="info" className="me-1">Trường đại học</Badge>
-                ) : (
-                  <Badge bg="secondary" className="me-1">Sở thích</Badge>
-                )}
-              </div>
-              
-              <div className="d-flex gap-2">
+            <Col lg={4} className="d-flex flex-column align-items-end justify-content-between">
+              <div className="group-actions mt-3 mt-lg-0 w-100">
                 {!isMember ? (
                   joinRequestPending ? (
-                    <Alert variant="info" className="p-2 mb-0 d-flex align-items-center">
-                      <BsExclamationTriangle className="me-2" />
-                      Yêu cầu tham gia đang chờ duyệt
+                    <Alert variant="info" className="p-3 mb-0 d-flex align-items-center pending-request-alert">
+                      <BsExclamationTriangle className="me-2 fs-4" />
+                      <div>
+                        <strong>Đang chờ duyệt</strong>
+                        <p className="mb-0 small">Yêu cầu tham gia của bạn đang được xem xét</p>
+                      </div>
                     </Alert>
                   ) : (
                     <Button 
                       variant="primary"
                       onClick={() => setShowJoinModal(true)}
-                      className="d-inline-flex align-items-center"
+                      className="d-inline-flex align-items-center join-group-btn w-100 py-2"
+                      size="lg"
                     >
-                      <BsPeopleFill className="me-1" />
+                      <BsPeopleFill className="me-2" />
                       Tham gia nhóm
                     </Button>
                   )
                 ) : (
-                  <>
+                  <div className="d-flex flex-column w-100 gap-2">
                     <Button 
                       as={Link}
                       to={`/unishare/groups/${group.id}/chat`}
-                      variant="outline-primary"
-                      className="d-inline-flex align-items-center"
+                      variant="primary"
+                      className="d-inline-flex align-items-center justify-content-center chat-btn py-2"
+                      size="lg"
                     >
-                      <BsChatDots className="me-1" />
-                      Trò chuyện
+                      <BsChatDots className="me-2" />
+                      Trò chuyện nhóm
                     </Button>
                     
                     {isAdmin ? (
                       <Button 
                         as={Link}
                         to={`/unishare/groups/${group.id}/members/manage`}
-                        variant="outline-secondary"
+                        variant="outline-primary"
+                        className="d-inline-flex align-items-center justify-content-center manage-members-btn py-2"
+                        size="lg"
                       >
+                        <BsPeopleFill className="me-2" />
                         Quản lý thành viên
                       </Button>
                     ) : (
                       <Button 
                         variant="outline-danger"
                         onClick={() => setShowLeaveModal(true)}
-                        className="d-inline-flex align-items-center"
+                        className="d-inline-flex align-items-center justify-content-center leave-group-btn py-2"
+                        size="lg"
                       >
-                        <BsDoorOpen className="me-1" />
-                        Rời nhóm
+                        <BsDoorOpen className="me-2" />
+                        Rời khỏi nhóm
                       </Button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </Col>
           </Row>
         </Card.Body>
+        
+        <style jsx="true">{`
+          .group-cover-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70%;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            z-index: 1;
+          }
+          
+          .z-index-1 {
+            z-index: 2;
+          }
+          
+          .group-title {
+            font-weight: 800;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #0d6efd, #6610f2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          
+          .group-privacy-badge, .group-type-badge {
+            font-size: 0.85rem;
+            padding: 0.5em 0.85em;
+            border-radius: 20px;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+          }
+          
+          .group-privacy-badge:hover, .group-type-badge:hover {
+            transform: translateY(-2px);
+          }
+          
+          .stats-icon-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+          }
+          
+          .group-stats:hover .stats-icon-circle {
+            transform: scale(1.1) rotate(10deg);
+          }
+          
+          .group-description {
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #0d6efd;
+            transition: all 0.3s ease;
+          }
+          
+          .group-description:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transform: translateX(5px);
+          }
+          
+          .description-title {
+            font-weight: 600;
+            color: #0d6efd;
+            font-size: 1.1rem;
+          }
+          
+          .edit-group-btn {
+            border-radius: 20px;
+            font-weight: 500;
+            padding: 0.4rem 1rem;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+          }
+          
+          .edit-group-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+          }
+          
+          .join-group-btn, .chat-btn, .manage-members-btn, .leave-group-btn {
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+          }
+          
+          .join-group-btn:hover, .chat-btn:hover, .manage-members-btn:hover, .leave-group-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+          }
+          
+          .pending-request-alert {
+            border-radius: 10px;
+            border-left: 4px solid #0dcaf0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+          }
+        `}</style>
       </Card>
       
-      {/* Join Group Modal */}
+      {/* Leave Group Modal */}
       <LeaveGroupModal 
         show={showLeaveModal} 
         onHide={() => setShowLeaveModal(false)} 
@@ -242,32 +362,53 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
       
       {/* Join Group Modal */}
       {showJoinModal && (
-        <div className="modal" style={{display: 'block', backgroundColor: 'rgba(0,0,0,0.5)'}}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Tham gia nhóm</h5>
+        <div className="modal join-group-modal" style={{display: 'block', backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h4 className="modal-title fw-bold">Tham gia nhóm</h4>
                 <button type="button" className="btn-close" onClick={() => setShowJoinModal(false)} disabled={joiningGroup}></button>
               </div>
-              <div className="modal-body">
-                <p>Bạn muốn tham gia nhóm <strong>{group.name}</strong>?</p>
+              <div className="modal-body pt-2 pb-4 px-4">
+                <div className="text-center mb-4">
+                  <div className="join-icon-container mb-3">
+                    <div className="join-icon-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center">
+                      <BsPeopleFill className="display-4 text-primary" />
+                    </div>
+                  </div>
+                  <h5 className="mb-3">Bạn muốn tham gia nhóm <strong className="text-primary">{group.name}</strong>?</h5>
+                </div>
                 
                 {group.is_private && (
-                  <div className="alert alert-info">
-                    <strong>Lưu ý:</strong> Đây là nhóm kín. Yêu cầu tham gia của bạn sẽ được gửi đến quản trị viên nhóm để duyệt.
+                  <div className="alert alert-info border-0 rounded-3 shadow-sm">
+                    <div className="d-flex">
+                      <div className="me-3">
+                        <BsExclamationTriangle className="fs-4" />
+                      </div>
+                      <div>
+                        <strong>Lưu ý:</strong> Đây là nhóm kín. Yêu cầu tham gia của bạn sẽ được gửi đến quản trị viên nhóm để duyệt.
+                      </div>
+                    </div>
                   </div>
                 )}
                 
                 {joinError && (
-                  <div className="alert alert-danger">
-                    {joinError}
+                  <div className="alert alert-danger border-0 rounded-3 shadow-sm">
+                    <div className="d-flex">
+                      <div className="me-3">
+                        <BsExclamationTriangle className="fs-4" />
+                      </div>
+                      <div>
+                        {joinError}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer border-top-0 pt-0">
                 <button 
                   type="button" 
-                  className="btn btn-secondary" 
+                  className="btn btn-light rounded-pill px-4 py-2" 
                   onClick={() => setShowJoinModal(false)} 
                   disabled={joiningGroup}
                 >
@@ -275,22 +416,46 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
                 </button>
                 <button 
                   type="button" 
-                  className="btn btn-primary" 
+                  className="btn btn-primary rounded-pill px-4 py-2 join-btn" 
                   onClick={handleJoinGroup} 
                   disabled={joiningGroup}
                 >
                   {joiningGroup ? (
                     <>
-                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                       Đang xử lý...
                     </>
-                  ) : group.is_private ? 'Gửi yêu cầu tham gia' : 'Tham gia'}
+                  ) : group.is_private ? 'Gửi yêu cầu tham gia' : 'Tham gia ngay'}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      
+      <style jsx="true">{`
+        .join-group-modal .modal-content {
+          border-radius: 16px;
+          overflow: hidden;
+        }
+        
+        .join-icon-circle {
+          width: 100px;
+          height: 100px;
+          border-radius: 50px;
+          transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .join-btn {
+          box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+          transition: all 0.3s ease;
+        }
+        
+        .join-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(13, 110, 253, 0.4);
+        }
+      `}</style>
     </>
   );
 };

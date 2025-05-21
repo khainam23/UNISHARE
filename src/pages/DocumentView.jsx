@@ -5,6 +5,7 @@ import { FaDownload, FaEye, FaEdit, FaTrash, FaArrowLeft, FaUser, FaCalendarAlt,
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { profileService } from '../services';
+import './DocumentView.css';
 
 const DocumentView = () => {
   const { id } = useParams();
@@ -107,12 +108,25 @@ const DocumentView = () => {
     return (
       <>
         <Header />
-        <Container className="py-5">
-          <div className="text-center">
-            <Spinner animation="border" variant="primary" />
-            <p className="mt-3">Đang tải thông tin tài liệu...</p>
-          </div>
-        </Container>
+        <div className="document-view-container">
+          <Container>
+            <div className="document-header-container">
+              <Button 
+                variant="outline-primary" 
+                className="back-button" 
+                onClick={() => navigate(-1)}
+              >
+                <FaArrowLeft className="me-2" /> Quay lại
+              </Button>
+              <h2 className="page-title">Chi tiết tài liệu</h2>
+              <div style={{ width: '100px' }}></div> {/* Empty div for flex spacing */}
+            </div>
+            <div className="loading-container">
+              <Spinner animation="border" variant="primary" className="loading-spinner" size="lg" />
+              <p className="loading-text">Đang tải thông tin tài liệu...</p>
+            </div>
+          </Container>
+        </div>
         <Footer />
       </>
     );
@@ -123,20 +137,35 @@ const DocumentView = () => {
     return (
       <>
         <Header />
-        <Container className="py-5">
-          <Alert variant="danger">
-            <Alert.Heading>Không thể tải thông tin tài liệu</Alert.Heading>
-            <p>{error}</p>
-            <div className="d-flex justify-content-between">
-              <Button variant="outline-primary" onClick={() => navigate('/unishare-files')}>
-                <FaArrowLeft className="me-2" /> Quay lại trang chủ
+        <div className="document-view-container">
+          <Container>
+            <div className="document-header-container">
+              <Button 
+                variant="outline-primary" 
+                className="back-button" 
+                onClick={() => navigate(-1)}
+              >
+                <FaArrowLeft className="me-2" /> Quay lại
               </Button>
-              <Button variant="outline-danger" onClick={() => window.location.reload()}>
-                Thử lại
-              </Button>
+              <h2 className="page-title">Chi tiết tài liệu</h2>
+              <div style={{ width: '100px' }}></div> {/* Empty div for flex spacing */}
             </div>
-          </Alert>
-        </Container>
+            <div className="error-container">
+              <Alert variant="danger" className="document-card">
+                <Alert.Heading>Không thể tải thông tin tài liệu</Alert.Heading>
+                <p>{error}</p>
+                <div className="d-flex justify-content-between">
+                  <Button variant="outline-primary" onClick={() => navigate('/unishare-files')} className="action-button">
+                    <FaArrowLeft className="action-button-icon" /> Quay lại trang chủ
+                  </Button>
+                  <Button variant="outline-danger" onClick={() => window.location.reload()} className="action-button">
+                    Thử lại
+                  </Button>
+                </div>
+              </Alert>
+            </div>
+          </Container>
+        </div>
         <Footer />
       </>
     );
@@ -147,15 +176,34 @@ const DocumentView = () => {
     return (
       <>
         <Header />
-        <Container className="py-5">
-          <Alert variant="warning">
-            <Alert.Heading>Không tìm thấy tài liệu</Alert.Heading>
-            <p>Tài liệu này không tồn tại hoặc đã bị xóa.</p>
-            <Button variant="primary" onClick={() => navigate('/unishare-files')}>
-              <FaArrowLeft className="me-2" /> Quay lại trang chủ
-            </Button>
-          </Alert>
-        </Container>
+        <div className="document-view-container">
+          <Container>
+            <div className="document-header-container">
+              <Button 
+                variant="outline-primary" 
+                className="back-button" 
+                onClick={() => navigate(-1)}
+              >
+                <FaArrowLeft className="me-2" /> Quay lại
+              </Button>
+              <h2 className="page-title">Chi tiết tài liệu</h2>
+              <div style={{ width: '100px' }}></div> {/* Empty div for flex spacing */}
+            </div>
+            <div className="error-container">
+              <Alert variant="warning" className="document-card">
+                <Alert.Heading>Không tìm thấy tài liệu</Alert.Heading>
+                <p>Tài liệu này không tồn tại hoặc đã bị xóa.</p>
+                <Button 
+                  variant="primary" 
+                  onClick={() => navigate('/unishare-files')}
+                  className="action-button"
+                >
+                  <FaArrowLeft className="action-button-icon" /> Quay lại trang chủ
+                </Button>
+              </Alert>
+            </div>
+          </Container>
+        </div>
         <Footer />
       </>
     );
@@ -164,179 +212,202 @@ const DocumentView = () => {
   return (
     <>
       <Header />
-      <Container className="py-4">
-        <Button 
-          variant="outline-primary" 
-          className="mb-4" 
-          onClick={() => navigate(-1)}
-        >
-          <FaArrowLeft className="me-2" /> Quay lại
-        </Button>
-        
-        <Row>
-          {/* Document info */}
-          <Col lg={8} className="mb-4">
-            <Card className="shadow-sm border-0">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-start mb-3">
-                  <div>
-                    <h3>{document.title}</h3>
-                    <div className="text-muted">
-                      {document.subject && <span className="me-3">Môn học: {document.subject}</span>}
-                      {document.course_code && <span>Mã môn: {document.course_code}</span>}
+      <div className="document-view-container">
+        <Container>
+          <div className="document-header-container">
+            <Button 
+              variant="outline-primary" 
+              className="back-button" 
+              onClick={() => navigate(-1)}
+            >
+              <FaArrowLeft className="me-2" /> Quay lại
+            </Button>
+            <h2 className="page-title">Chi tiết tài liệu</h2>
+            <div style={{ width: '100px' }}></div> {/* Empty div for flex spacing */}
+          </div>
+          
+          <Row>
+            {/* Document info */}
+            <Col lg={8} className="mb-4">
+              <Card className="document-card">
+                <Card.Body className="p-4">
+                  <div className="d-flex justify-content-between align-items-start mb-4 document-header">
+                    <div>
+                      <h3 className="document-title">{document.title}</h3>
+                      <div className="document-subtitle">
+                        {document.subject && <span className="me-3">Môn học: {document.subject}</span>}
+                        {document.course_code && <span>Mã môn: {document.course_code}</span>}
+                      </div>
+                    </div>
+                    <div className="document-badges">
+                      {document.is_approved ? (
+                        <Badge bg="success" className="document-badge">Đã duyệt</Badge>
+                      ) : (
+                        <Badge bg="warning" text="dark" className="document-badge">Chờ duyệt</Badge>
+                      )}
+                      {document.is_official && (
+                        <Badge bg="primary" className="document-badge ms-2">Chính thức</Badge>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    {document.is_approved ? (
-                      <Badge bg="success" className="fs-6">Đã duyệt</Badge>
-                    ) : (
-                      <Badge bg="warning" text="dark" className="fs-6">Chờ duyệt</Badge>
-                    )}
-                    {document.is_official && (
-                      <Badge bg="primary" className="ms-2 fs-6">Chính thức</Badge>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Description */}
-                <div className="mb-4">
-                  <h5>Mô tả</h5>
-                  <p>{document.description || 'Không có mô tả'}</p>
-                </div>
-                
-                {/* File details */}
-                <div className="mb-4">
-                  <h5>Thông tin file</h5>
-                  <div className="row">
-                    <div className="col-md-6">
-                      <p><strong>Tên file:</strong> {document.file_name}</p>
-                      <p><strong>Loại file:</strong> {document.file_type}</p>
+                  
+                  {/* Description */}
+                  <div className="mb-4">
+                    <h5 className="section-title">Mô tả</h5>
+                    <div className="description-box">
+                      <p className="mb-0">{document.description || 'Không có mô tả'}</p>
                     </div>
-                    <div className="col-md-6">
-                      <p>
-                        <strong>Kích thước:</strong> {
-                          document.file_size ? (
-                            (document.file_size / (1024 * 1024)).toFixed(2) + ' MB'
-                          ) : 'N/A'
-                        }
-                      </p>
-                      <p>
-                        <strong>Ngày tải lên:</strong> {
+                  </div>
+                  
+                  {/* File details */}
+                  <div className="mb-4">
+                    <h5 className="section-title">Thông tin file</h5>
+                    <div className="file-details">
+                      <div className="row">
+                        <div className="col-md-6">
+                          <div className="file-detail-item">
+                            <span className="file-detail-label">Tên file:</span>
+                            <span className="file-detail-value">{document.file_name}</span>
+                          </div>
+                          <div className="file-detail-item">
+                            <span className="file-detail-label">Loại file:</span>
+                            <span className="file-detail-value">{document.file_type}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="file-detail-item">
+                            <span className="file-detail-label">Kích thước:</span>
+                            <span className="file-detail-value">
+                              {document.file_size ? (
+                                (document.file_size / (1024 * 1024)).toFixed(2) + ' MB'
+                              ) : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="file-detail-item">
+                            <span className="file-detail-label">Ngày tải lên:</span>
+                            <span className="file-detail-value">
+                              {new Date(document.created_at).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Document actions */}
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div className="stats-container">
+                      <div className="stat-item">
+                        <FaEye className="stat-icon text-primary" /> 
+                        <span>{document.view_count || 0} lượt xem</span>
+                      </div>
+                      <div className="stat-item">
+                        <FaDownload className="stat-icon text-success" /> 
+                        <span>{document.download_count || 0} lượt tải</span>
+                      </div>
+                    </div>
+                    <div className="action-buttons">
+                      {error && <span className="text-danger me-3">{error}</span>}
+                      
+                      {document.user_id === parseInt(localStorage.getItem('user_id')) && (
+                        <Button 
+                          as={Link}
+                          to={`/unishare-files/edit/${document.id}`}
+                          variant="outline-primary" 
+                          className="action-button"
+                        >
+                          <FaEdit className="action-button-icon" /> Chỉnh sửa
+                        </Button>
+                      )}
+                      
+                      <Button 
+                        variant="primary" 
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        className="action-button"
+                      >
+                        {downloading ? (
+                          <>
+                            <Spinner as="span" animation="border" size="sm" className="me-2" />
+                            Đang tải xuống...
+                          </>
+                        ) : (
+                          <>
+                            <FaDownload className="action-button-icon" /> Tải xuống
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+            
+            {/* User and file preview */}
+            <Col lg={4}>
+              {/* Document uploader info */}
+              <Card className="uploader-card mb-4">
+                <Card.Body className="p-4">
+                  <h5 className="section-title">Người đăng tải</h5>
+                  <div className="d-flex align-items-center">
+                    <div className="uploader-avatar">
+                      <FaUser />
+                    </div>
+                    <div>
+                      <p className="uploader-name mb-1">{document.user?.name || 'Người dùng'}</p>
+                      <p className="uploader-date mb-0">
+                        <FaCalendarAlt className="me-1" /> Ngày đăng: {
                           new Date(document.created_at).toLocaleDateString('vi-VN')
                         }
                       </p>
                     </div>
                   </div>
-                </div>
-                
-                {/* Document actions */}
-                <div className="d-flex justify-content-between">
-                  <div>
-                    <span className="me-3">
-                      <FaEye className="me-1 text-primary" /> {document.view_count || 0} lượt xem
-                    </span>
-                    <span>
-                      <FaDownload className="me-1 text-success" /> {document.download_count || 0} lượt tải
-                    </span>
+                </Card.Body>
+              </Card>
+              
+              {/* Document preview */}
+              <Card className="preview-card">
+                <Card.Body className="p-4 text-center">
+                  <div className="file-preview">
+                    <FaFileAlt className="file-icon" />
                   </div>
-                  <div>
-                    {error && <span className="text-danger me-3">{error}</span>}
-                    
-                    {document.user_id === parseInt(localStorage.getItem('user_id')) && (
-                      <Button 
-                        as={Link}
-                        to={`/unishare-files/edit/${document.id}`}
-                        variant="outline-primary" 
-                        className="me-2"
-                      >
-                        <FaEdit className="me-1" /> Chỉnh sửa
-                      </Button>
-                    )}
-                    
-                    <Button 
-                      variant="primary" 
-                      onClick={handleDownload}
-                      disabled={downloading}
-                    >
-                      {downloading ? (
-                        <>
-                          <Spinner as="span" animation="border" size="sm" className="me-2" />
-                          Đang tải xuống...
-                        </>
-                      ) : (
-                        <>
-                          <FaDownload className="me-2" /> Tải xuống
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          
-          {/* User and file preview */}
-          <Col lg={4}>
-            {/* Document uploader info */}
-            <Card className="shadow-sm border-0 mb-4">
-              <Card.Body>
-                <h5>Người đăng tải</h5>
-                <div className="d-flex align-items-center">
-                  <div className="bg-light rounded-circle p-3 me-3">
-                    <FaUser className="text-primary" />
-                  </div>
-                  <div>
-                    <p className="mb-1 fw-bold">{document.user?.name || 'Người dùng'}</p>
-                    <p className="text-muted mb-0">
-                      <FaCalendarAlt className="me-1" /> Ngày đăng: {
-                        new Date(document.created_at).toLocaleDateString('vi-VN')
+                  <div className="file-info">
+                    <p className="mb-1">
+                      <strong>Dung lượng:</strong> {
+                        document.file_size ? (
+                          (document.file_size / (1024 * 1024)).toFixed(2) + ' MB'
+                        ) : 'N/A'
                       }
                     </p>
+                    <p className="mb-3">
+                      <strong>Định dạng:</strong> {document.file_type}
+                    </p>
                   </div>
-                </div>
-              </Card.Body>
-            </Card>
-            
-            {/* Document preview */}
-            <Card className="shadow-sm border-0">
-              <Card.Body className="text-center">
-                <div className="mb-3 p-5 bg-light rounded">
-                  <FaFileAlt size={80} className="text-primary" />
-                </div>
-                <p className="mb-1">
-                  <strong>Dung lượng:</strong> {
-                    document.file_size ? (
-                      (document.file_size / (1024 * 1024)).toFixed(2) + ' MB'
-                    ) : 'N/A'
-                  }
-                </p>
-                <p className="mb-3">
-                  <strong>Định dạng:</strong> {document.file_type}
-                </p>
-                <Button 
-                  variant="primary" 
-                  className="w-100"
-                  onClick={handleDownload}
-                  disabled={downloading}
-                >
-                  {downloading ? (
-                    <>
-                      <Spinner as="span" animation="border" size="sm" className="me-2" />
-                      Đang tải xuống...
-                    </>
-                  ) : (
-                    <>
-                      <FaDownload className="me-2" /> Tải xuống
-                    </>
-                  )}
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-        
-        {/* Related documents could be added here */}
-      </Container>
+                  <Button 
+                    variant="primary" 
+                    className="download-button w-100"
+                    onClick={handleDownload}
+                    disabled={downloading}
+                  >
+                    {downloading ? (
+                      <>
+                        <Spinner as="span" animation="border" size="sm" className="me-2" />
+                        Đang tải xuống...
+                      </>
+                    ) : (
+                      <>
+                        <FaDownload className="me-2" /> Tải xuống tài liệu
+                      </>
+                    )}
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          {/* Related documents could be added here */}
+        </Container>
+      </div>
       <Footer />
     </>
   );
