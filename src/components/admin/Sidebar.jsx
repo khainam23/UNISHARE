@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FaHome, FaChartBar, FaBook, FaUsers, FaUserFriends, FaEnvelope, 
-         FaComments, FaUserShield, FaClipboardList, FaKey, FaFileAlt, 
-         FaCog, FaWallet, FaQuestionCircle } from 'react-icons/fa';
+import { FaHome, FaChartBar, FaBook, FaUsers, FaUserFriends, 
+         FaUserShield, FaKey, 
+         FaCog, FaQuestionCircle } from 'react-icons/fa';
 
 const NavItem = ({ icon: Icon, text, link, active }) => (
   <Link
@@ -33,17 +33,12 @@ const Sidebar = () => {
     { icon: FaBook, text: 'Quản Lý Tài Liệu', link: '/admin/documents', active: currentPath.includes('/admin/documents') },
     { icon: FaUsers, text: 'Quản Lý Người Dùng', link: '/admin/users', active: currentPath === '/admin/users' },
     { icon: FaUserFriends, text: 'Quản Lý Nhóm', link: '/admin/groups', active: currentPath.includes('/admin/groups') },
-    { icon: FaEnvelope, text: 'Tin Nhắn', link: '/admin/messages', active: currentPath === '/admin/messages' },
-    { icon: FaComments, text: 'Quản Lý Bình Luận', link: '/admin/comments', active: currentPath === '/admin/comments' },
     { icon: FaUserShield, text: 'Quản Lý Báo Cáo', link: '/admin/reports', active: currentPath === '/admin/reports' },
-    { icon: FaClipboardList, text: 'Duyệt Nội Dung', link: '/admin/content-review', active: currentPath === '/admin/content-review' },
     { icon: FaKey, text: 'Quản Lý Phân Quyền', link: '/admin/permissions', active: currentPath === '/admin/permissions' },
-    { icon: FaFileAlt, text: 'Báo Cáo & Thống Kê', link: '/admin/statistics', active: currentPath === '/admin/statistics' },
   ];
 
   const otherItems = [
     { icon: FaCog, text: 'Cài Đặt', link: '/admin/settings', active: currentPath === '/admin/settings' },
-    { icon: FaWallet, text: 'Tài Khoản', link: '/admin/account', active: currentPath === '/admin/account' },
     { icon: FaQuestionCircle, text: 'Giúp Đỡ', link: '/admin/help', active: currentPath === '/admin/help' },
   ];
 

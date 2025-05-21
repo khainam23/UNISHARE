@@ -81,6 +81,9 @@ function App() {
           {/* Search results page */}
           <Route path="/search" element={<SearchResultsPage />} />
           
+          {/* Document view route from homepage */}
+          <Route path="/document/:id" element={<DocumentView />} />
+          
           <Route path="/profile" element={
             <ProtectedRoute>
               <ProfilePage />

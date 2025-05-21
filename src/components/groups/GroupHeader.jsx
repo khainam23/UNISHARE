@@ -60,10 +60,13 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
           if (onJoinGroup) onJoinGroup(false, true);
         }
       } else {
-        throw new Error(response.message || 'Không thể tham gia nhóm');
+        // Handle error response without throwing
+        console.error("Error joining group:", response.message);
+        setJoinError(response.message || 'Không thể tham gia nhóm. Vui lòng thử lại sau.');
       }
     } catch (err) {
-      console.error("Error joining group:", err);
+      // This will only catch unexpected errors that weren't handled by the service
+      console.error("Unexpected error joining group:", err);
       setJoinError('Không thể tham gia nhóm. Vui lòng thử lại sau.');
     } finally {
       setJoiningGroup(false);

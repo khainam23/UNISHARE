@@ -1,29 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Row, Col, Spinner } from 'react-bootstrap';
-import adminService from '../../services/adminService';
+import React from 'react';
+import { Spinner } from 'react-bootstrap';
 
-const Dashboard = () => {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Fetch dashboard stats on component mount
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await adminService.getDashboardStats();
-        setStats(data);
-      } catch (err) {
-        console.error("Error fetching dashboard stats:", err);
-        setError("Không thể tải dữ liệu thống kê");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchStats();
-  }, []);
-
+const Dashboard = ({ user }) => {
   // Light blue gradient background
   const backgroundStyle = {
     background: 'linear-gradient(to bottom right, #d4eafb, #e6f4fd)',
@@ -123,28 +101,6 @@ const Dashboard = () => {
     }
   ];
 
-  // Wave-like pattern elements
-  const wavePatterns = [
-    {
-      position: 'absolute',
-      bottom: '20%',
-      right: '5%',
-      width: '100px',
-      height: '50px',
-      zIndex: 1,
-      opacity: 0.4
-    },
-    {
-      position: 'absolute',
-      top: '15%',
-      left: '30%',
-      width: '80px',
-      height: '40px',
-      zIndex: 1,
-      opacity: 0.3
-    }
-  ];
-
   // Linear elements
   const linearElements = [
     {
@@ -167,18 +123,39 @@ const Dashboard = () => {
     }
   ];
 
-  if (loading) {
+  // Get current time to show appropriate greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Chào buổi sáng";
+    if (hour < 18) return "Chào buổi chiều";
+    return "Chào buổi tối";
+  };
+
+  // Get role display name
+  const getRoleDisplay = () => {
+    if (!user || !user.roles || user.roles.length === 0) {
+      return 'Quản trị viên';
+    }
+
+    const role = user.roles[0].name;
+    switch (role) {
+      case 'admin':
+        return 'Quản trị viên';
+      case 'moderator':
+        return 'Người kiểm duyệt';
+      case 'lecturer':
+        return 'Giảng viên';
+      case 'student':
+        return 'Sinh viên';
+      default:
+        return role.charAt(0).toUpperCase() + role.slice(1);
+    }
+  };
+
+  if (!user) {
     return (
       <div className="welcome-section mb-4 d-flex justify-content-center align-items-center" style={backgroundStyle}>
         <Spinner animation="border" variant="primary" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="welcome-section mb-4 d-flex justify-content-center align-items-center" style={backgroundStyle}>
-        <div className="text-danger">{error}</div>
       </div>
     );
   }
@@ -216,24 +193,24 @@ const Dashboard = () => {
             color: '#0370B7',
             marginBottom: '4px'
           }}>
-            CHÀO MỪNG ĐẾN
+            {getGreeting()}
           </div>
           <div style={{ 
-            fontSize: '24px', 
+            fontSize: '20px', 
             fontWeight: 'bold', 
             color: '#0370B7',
             marginBottom: '4px',
             letterSpacing: '0.5px'
           }}>
-            UNISHARE
+            {user.name || 'Admin'}
           </div>
           <div style={{ 
-            fontSize: '10px', 
+            fontSize: '12px', 
             color: '#0370B7', 
             opacity: 0.8,
-            letterSpacing: '1px'
+            letterSpacing: '0.5px'
           }}>
-            PHIÊN BẢN BETA
+            {getRoleDisplay()}
           </div>
         </div>
       </div>
