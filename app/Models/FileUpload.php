@@ -108,8 +108,16 @@ class FileUpload extends Model
                 // Return the URL using the Storage facade
                 return Storage::url(str_replace('public/', '', $this->file_path));
             } else {
+                // For files in private directory, normalize the path for the API endpoint
+                $path = $this->file_path;
+                
+                // Remove 'private/' prefix if present for API URL
+                if (strpos($path, 'private/') === 0) {
+                    $path = substr($path, 8);
+                }
+                
                 // Return a URL that will be handled by our StorageController
-                return url('/api/storage/file/' . $this->file_path);
+                return url('/api/storage/file/' . $path);
             }
         } elseif ($this->storage_type === 'google_drive' && $this->google_drive_id) {
             // Return Google Drive URL

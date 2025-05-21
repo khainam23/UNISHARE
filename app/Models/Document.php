@@ -33,9 +33,8 @@ class Document extends Model
         'course_code',
         'download_count',
         'view_count',
-        'type',    // Added for course/document distinction
-        'status',  // Added for document status (approved, pending, etc.)
-        'price',   // Added for free/paid distinction
+        'type',    
+        'status',
     ];
 
     /**
@@ -49,7 +48,6 @@ class Document extends Model
         'file_size' => 'integer',
         'download_count' => 'integer',
         'view_count' => 'integer',
-        'price' => 'float',
     ];
 
     /**
@@ -171,17 +169,35 @@ class Document extends Model
     }
 
     /**
-     * Scope a query to only include free documents.
+     * Get the download URL for the document
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return string
      */
-    public function scopeFree($query)
+    public function getDownloadUrlAttribute()
     {
-        return $query->where(function($query) {
-            $query->where('price', 0)
-                  ->orWhereNull('price');
-        });
+        // Remove 'private/' prefix if present for API URL
+        $path = $this->file_path;
+        if (strpos($path, 'private/') === 0) {
+            $path = substr($path, 8);
+        }
+        
+        return url('/api/storage/download/' . $path);
+    }
+    
+    /**
+     * Get the view URL for the document
+     *
+     * @return string
+     */
+    public function getViewUrlAttribute()
+    {
+        // Remove 'private/' prefix if present for API URL
+        $path = $this->file_path;
+        if (strpos($path, 'private/') === 0) {
+            $path = substr($path, 8);
+        }
+        
+        return url('/api/storage/file/' . $path);
     }
 
     /**

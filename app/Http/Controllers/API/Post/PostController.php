@@ -275,6 +275,9 @@ class PostController extends Controller
             return response()->json(['message' => 'You have not liked this post'], 400);
         }
         
+        // Decrement like count after unlike
+        $post->decrementLikeCount();
+        
         return response()->json(['message' => 'Post unliked successfully']);
     }
 }

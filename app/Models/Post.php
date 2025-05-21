@@ -17,6 +17,7 @@ class Post extends Model
      */
     protected $fillable = [
         'content',
+        'title',
         'user_id',
         'group_id',
         'is_pinned',
@@ -71,5 +72,21 @@ class Post extends Model
     public function likes()
     {
         return $this->morphMany(Like::class, 'likeable');
+    }
+
+    /**
+     * Increment the like count.
+     */
+    public function incrementLikeCount()
+    {
+        $this->increment('like_count');
+    }
+
+    /**
+     * Decrement the like count.
+     */
+    public function decrementLikeCount()
+    {
+        $this->decrement('like_count');
     }
 }

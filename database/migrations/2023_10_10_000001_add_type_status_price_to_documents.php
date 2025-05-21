@@ -22,11 +22,6 @@ return new class extends Migration
                 $table->string('status')->default('pending')->after('type');
             }
             
-            // Add price column if it doesn't exist
-            if (!Schema::hasColumn('documents', 'price')) {
-                $table->decimal('price', 10, 2)->default(0)->after('status');
-            }
-
             // Add foreign key for group_id if it doesn't exist
             if (!Schema::hasColumn('documents', 'group_id')) {
                 $table->foreignId('group_id')->nullable()->after('user_id')->constrained()->nullOnDelete();
@@ -36,7 +31,6 @@ return new class extends Migration
         // Ensure existing documents have appropriate values
         DB::table('documents')->whereNull('status')->update(['status' => 'approved']);
         DB::table('documents')->whereNull('type')->update(['type' => 'document']);
-        DB::table('documents')->whereNull('price')->update(['price' => 0]);
     }
 
     /**
@@ -54,9 +48,6 @@ return new class extends Migration
                 $table->dropColumn('status');
             }
             
-            if (Schema::hasColumn('documents', 'price')) {
-                $table->dropColumn('price');
-            }
         });
     }
 };

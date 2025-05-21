@@ -28,81 +28,49 @@ class FileUploadService
     }
 
     /**
-     * Upload a file and create a FileUpload record
+     * Upload a file to the appropriate storage location
      *
-     * @param UploadedFile|null $file The file to upload
-     * @param int $userId User ID
-     * @param string|null $type Type of upload (document, avatar, etc.)
-     * @param string|null $modelId Model ID for morphable relation
-     * @param string|null $storageType Storage type (local, google_drive, minio)
+     * @param UploadedFile $file
+     * @param int $userId
+     * @param string $type
+     * @param int|null $entityId
      * @return FileUpload
      */
-    public function uploadFile(?UploadedFile $file, int $userId, ?string $type = null, ?string $modelId = null, ?string $storageType = 'local')
+    public function uploadFile(UploadedFile $file, int $userId, string $type, int $entityId = null)
     {
-        if (!$file) {
-            throw new \Exception('No file provided');
-        }
-
-        // Calculate the file hash
-        $fileHash = hash_file('md5', $file->getPathname());
+        // Generate a unique filename
+        $extension = $file->getClientOriginalExtension();
+        $uniqueId = (string) Str::uuid();
+        $uniqueFilename = $uniqueId . '.' . $extension;
         
-        // Check if this file already exists based on hash
-        $existingUpload = FileUpload::where('file_hash', $fileHash)->where('status', 'completed')->first();
+        // Determine the storage directory without 'private/' prefix
+        // since Laravel's store method will handle this correctly
+        $storageDir = 'uploads/' . $userId . '/' . $type;
         
-        // If we already have this file, we'll create a new record but reuse the existing file
-        if ($existingUpload) {
-            // Create a new upload record that references the same file
-            $fileUpload = new FileUpload([
-                'user_id' => $userId,
-                'original_filename' => $file->getClientOriginalName(),
-                'stored_filename' => $existingUpload->stored_filename,
-                'file_path' => $existingUpload->file_path,
-                'file_type' => $file->getMimeType(),
-                'file_size' => $file->getSize(),
-                'file_hash' => $fileHash,
-                'status' => 'completed',
-                'storage_type' => $storageType,
-            ]);
-            
-            $fileUpload->save();
-            
-            return $fileUpload;
-        }
+        // Use the 'private' disk to store in private directory
+        $path = $file->storeAs($storageDir, $uniqueFilename, 'private');
         
-        // Create a unique filename
-        $storedFilename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        // Create file hash
+        $fileHash = md5_file($file->getRealPath());
         
-        // Define folder path based on user and type - store in private directory
-        $folderPath = 'private/uploads/' . $userId;
-        if ($type) {
-            $folderPath .= '/' . $type;
-        }
-        
-        // Store the file
-        $filePath = $file->storeAs($folderPath, $storedFilename);
-        
-        if (!$filePath) {
-            throw new \Exception('Failed to store file');
-        }
-        
-        // Create file upload record
-        $fileUpload = new FileUpload([
-            'user_id' => $userId,
-            'original_filename' => $file->getClientOriginalName(),
-            'stored_filename' => $storedFilename,
-            'file_path' => $filePath,
-            'file_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
-            'file_hash' => $fileHash,
-            'status' => 'completed',
-            'storage_type' => $storageType,
-        ]);
-        
+        // Create a FileUpload record
+        $fileUpload = new FileUpload();
+        $fileUpload->user_id = $userId;
+        $fileUpload->original_filename = $file->getClientOriginalName();
+        $fileUpload->stored_filename = $uniqueFilename;
+        $fileUpload->file_path = $path; // This will include 'private/' prefix automatically
+        $fileUpload->file_type = $file->getMimeType();
+        $fileUpload->file_size = $file->getSize();
+        $fileUpload->file_hash = $fileHash;
+        $fileUpload->storage_type = 'local';
+        $fileUpload->status = 'completed';
+        $fileUpload->uploadable_type = $type;
+        $fileUpload->uploadable_id = $entityId;
         $fileUpload->save();
         
         return $fileUpload;
     }
-    
+
     /**
      * Check if a file exists based on its hash
      *
@@ -240,13 +208,14 @@ class FileUploadService
         $finalDir = "uploads/{$fileUpload->user_id}";
         $finalPath = "{$finalDir}/{$finalFilename}";
         
-        // Ensure directory exists
-        if (!Storage::disk('local')->exists($finalDir)) {
-            Storage::disk('local')->makeDirectory($finalDir);
+        // Ensure directory exists in private disk
+        if (!Storage::disk('private')->exists($finalDir)) {
+            Storage::disk('private')->makeDirectory($finalDir);
         }
         
-        // Create file handle for the final file
-        $finalFile = fopen(storage_path("app/{$finalPath}"), 'wb');
+        // Create file handle for the final file - use private disk path
+        $finalFilePath = storage_path("app/private/{$finalPath}");
+        $finalFile = fopen($finalFilePath, 'wb');
         
         // Append each chunk
         for ($i = 0; $i < $totalChunks; $i++) {
@@ -263,7 +232,8 @@ class FileUploadService
             'stored_filename' => $finalFilename,
         ]);
         
-        return $finalPath;
+        // Return path with 'private/' prefix
+        return 'private/' . $finalPath;
     }
     
     /**

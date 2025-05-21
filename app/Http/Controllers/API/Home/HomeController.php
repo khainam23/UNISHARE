@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DocumentResource;
 use App\Http\Resources\PostResource;
 use App\Models\Document;
+use App\Models\Group;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -21,10 +22,9 @@ class HomeController extends Controller
     public function getPopularCourses(Request $request)
     {
         try {
-            // First try to get real courses from the database
-            $courses = Document::courses()
-                ->approved()
-                ->orderBy('download_count', 'desc')
+            // Query groups with type 'course' and order by member_count
+            $courses = Group::where('type', 'course')
+                ->orderBy('member_count', 'desc')
                 ->take(4)
                 ->get();
 
@@ -41,12 +41,11 @@ class HomeController extends Controller
                 'data' => $courses->map(function ($course) {
                     return [
                         'id' => $course->id,
-                        'title' => $course->title,
-                        'description' => $course->description ?? substr($course->title, 0, 100),
-                        'thumbnail' => $course->thumbnail_url, // Using the accessor
-                        'price' => $course->price ?? 0,
-                        'downloads' => $course->download_count,
-                        'ratings' => $course->average_rating ?? 4.5,
+                        'title' => $course->name,
+                        'description' => $course->description ?? substr($course->name, 0, 100),
+                        'thumbnail' => $course->cover_image ? url('storage/' . $course->cover_image) : url('storage/courses/course' . ($course->id % 4 + 1) . '.jpg'),
+                        'member_count' => $course->member_count ?? 0,
+                        'course_code' => $course->course_code,
                     ];
                 }),
             ]);
@@ -186,6 +185,48 @@ class HomeController extends Controller
     }
 
     /**
+     * Get popular study groups for the homepage
+     */
+    public function getStudyGroups(Request $request)
+    {
+        try {
+            // Query groups that are not of type 'course' and order by member_count
+            $studyGroups = Group::whereNotIn('type', ['course'])
+                ->orderBy('member_count', 'desc')
+                ->take(4)
+                ->get();
+
+            // If no study groups found, return dummy data
+            if ($studyGroups->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $this->getDummyStudyGroups(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $studyGroups->map(function ($group) {
+                    return [
+                        'id' => $group->id,
+                        'title' => $group->name,
+                        'description' => $group->description ?? substr($group->name, 0, 100),
+                        'thumbnail' => $group->cover_image ? url('storage/' . $group->cover_image) : url('storage/courses/course' . ($group->id % 4 + 1) . '.jpg'),
+                        'type' => $group->type,
+                        'member_count' => $group->member_count ?? 0,
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getStudyGroups: ' . $e->getMessage());
+            return response()->json([
+                'success' => true,
+                'data' => $this->getDummyStudyGroups(),
+            ]);
+        }
+    }
+
+    /**
      * Generate dummy courses data
      */
     private function getDummyCourses()
@@ -234,6 +275,55 @@ class HomeController extends Controller
                 'price' => 180000,
                 'downloads' => 689,
                 'ratings' => 4.9,
+            ],
+        ];
+    }
+
+    /**
+     * Generate dummy study groups data
+     */
+    private function getDummyStudyGroups()
+    {
+        // Make sure directories exist before returning URLs
+        $this->ensureDirectoriesExist();
+
+        // Create dummy images if needed
+        $this->createDummyImagesIfMissing('courses', [
+            'course1.jpg', 'course2.jpg', 'course3.jpg', 'course4.jpg'
+        ]);
+        
+        return [
+            [
+                'id' => 10,
+                'title' => 'Nhóm học Toán cao cấp',
+                'description' => 'Nhóm học tập và trao đổi về các chủ đề Toán cao cấp cho sinh viên năm nhất và năm hai.',
+                'thumbnail' => url('storage/courses/course1.jpg'),
+                'type' => 'university',
+                'member_count' => 42,
+            ],
+            [
+                'id' => 11,
+                'title' => 'CLB Vật lý',
+                'description' => 'Câu lạc bộ dành cho những người yêu thích Vật lý. Thảo luận về các chủ đề từ cơ bản đến nâng cao.',
+                'thumbnail' => url('storage/courses/course2.jpg'),
+                'type' => 'interest',
+                'member_count' => 35,
+            ],
+            [
+                'id' => 12,
+                'title' => 'Nhóm nghiên cứu Khoa học máy tính',
+                'description' => 'Nhóm nghiên cứu và trao đổi về các chủ đề Khoa học máy tính từ thuật toán đến AI.',
+                'thumbnail' => url('storage/courses/course3.jpg'),
+                'type' => 'university',
+                'member_count' => 28,
+            ],
+            [
+                'id' => 13,
+                'title' => 'Nhóm ôn thi Tiếng Anh',
+                'description' => 'Nhóm hỗ trợ học tập và ôn thi các chứng chỉ Tiếng Anh như TOEIC, IELTS, và TOEFL.',
+                'thumbnail' => url('storage/courses/course4.jpg'),
+                'type' => 'interest',
+                'member_count' => 53,
             ],
         ];
     }

@@ -212,6 +212,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // File storage routes - require authentication
     Route::get('/storage/file/{path}', [App\Http\Controllers\API\StorageController::class, 'getFile'])->where('path', '.*');
+    Route::get('/storage/download/{path}', [App\Http\Controllers\API\StorageController::class, 'downloadFile'])->where('path', '.*');
     Route::get('/storage/preview/{path}', [App\Http\Controllers\API\StorageController::class, 'previewFile'])->where('path', '.*');
 
     // API cho sinh viên
@@ -307,6 +308,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/history', [App\Http\Controllers\API\User\UserHistoryController::class, 'index']);
         Route::get('/groups', [App\Http\Controllers\API\User\UserGroupController::class, 'index']);
         Route::get('/groups/{groupId}', [App\Http\Controllers\API\User\UserGroupController::class, 'show']);
+    });
+
+    // Post attachment routes
+    Route::prefix('post-attachments')->group(function () {
+        Route::get('/{attachment}/url', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'getFileUrl']);
+        Route::get('/{attachment}/download', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'download']);
     });
 });
 

@@ -7,7 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\Document;
+use App\Models\FileUpload;
+use App\Models\PostAttachment;
 
 class StorageController extends Controller
 {
@@ -21,45 +24,55 @@ class StorageController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
         
-        $fullPath = storage_path('app/public/' . $path);
+        // Normalize the path by removing any leading slashes
+        $path = ltrim($path, '/');
+        
+        // Get the full path based on the relative path, without adding extra 'private/' prefix
+        if (strpos($path, 'public/') === 0) {
+            // Public storage
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'private/') === 0) {
+            // If path already starts with 'private/', use it directly
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'uploads/') === 0) {
+            // If path starts with 'uploads/', add 'private/' prefix once
+            $fullPath = storage_path('app/private/' . $path);
+        } else {
+            // For other paths, add 'private/' prefix
+            $fullPath = storage_path('app/private/' . $path);
+        }
+        
+        Log::info('File access request', [
+            'path' => $path,
+            'fullPath' => $fullPath,
+            'user_id' => Auth::id()
+        ]);
         
         if (!File::exists($fullPath)) {
+            Log::warning('File not found', ['path' => $path, 'fullPath' => $fullPath]);
             return response()->json(['error' => 'File not found'], 404);
         }
         
-        // Special case for all public directories
-        $publicDirectories = ['blog', 'courses', 'documents', 'avatars'];
-        $pathParts = explode('/', $path);
+        // Check access permissions based on file type and location
+        $canAccess = $this->checkFileAccess($request->user(), $path);
         
-        if (in_array($pathParts[0], $publicDirectories)) {
-            // These directories have public content that any authenticated user can access
-            $mimeType = File::mimeType($fullPath);
-            $contents = File::get($fullPath);
-            
-            return response($contents, 200)
-                ->header('Content-Type', $mimeType);
-        }
-        
-        // For non-public files, check permissions
-        $documentId = null;
-        
-        // Try to extract document ID from path if it follows a pattern
-        if (count($pathParts) >= 2 && strpos($path, 'uploads/documents/') === 0) {
-            $documentId = intval($pathParts[2]);
-        }
-        
-        if ($documentId) {
-            $document = Document::find($documentId);
-            if ($document && !$this->userCanAccessDocument($request->user(), $document)) {
-                return response()->json(['error' => 'Unauthorized access'], 403);
-            }
+        if (!$canAccess) {
+            Log::warning('Unauthorized file access attempt', [
+                'path' => $path, 
+                'user_id' => Auth::id()
+            ]);
+            return response()->json(['error' => 'Unauthorized access'], 403);
         }
         
         $mimeType = File::mimeType($fullPath);
         $contents = File::get($fullPath);
         
+        // Set a more descriptive filename for the browser
+        $fileName = $this->getDisplayFilename($path);
+        
         return response($contents, 200)
-            ->header('Content-Type', $mimeType);
+            ->header('Content-Type', $mimeType)
+            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
     }
     
     /**
@@ -67,9 +80,26 @@ class StorageController extends Controller
      */
     public function previewFile(Request $request, $path)
     {
-        $fullPath = storage_path('app/public/' . $path);
+        // Normalize the path
+        $path = ltrim($path, '/');
+        
+        // Get the full path based on the relative path
+        if (strpos($path, 'public/') === 0) {
+            // Public storage
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'private/') === 0) {
+            // If path already starts with 'private/', use it directly
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'uploads/') === 0) {
+            // If path starts with 'uploads/', add 'private/' prefix once
+            $fullPath = storage_path('app/private/' . $path);
+        } else {
+            // For other paths, add 'private/' prefix
+            $fullPath = storage_path('app/private/' . $path);
+        }
         
         if (!File::exists($fullPath)) {
+            Log::warning('Preview file not found', ['path' => $path, 'fullPath' => $fullPath]);
             return response()->json(['error' => 'File not found'], 404);
         }
         
@@ -83,40 +113,256 @@ class StorageController extends Controller
         ];
         
         if (!in_array($mimeType, $previewableMimeTypes)) {
+            Log::warning('File type not previewable', ['path' => $path, 'mime_type' => $mimeType]);
             return response()->json(['error' => 'File type not previewable'], 403);
         }
         
         $contents = File::get($fullPath);
         
+        // Set a more descriptive filename for the browser
+        $fileName = $this->getDisplayFilename($path);
+        
         return response($contents, 200)
-            ->header('Content-Type', $mimeType);
+            ->header('Content-Type', $mimeType)
+            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
     }
     
     /**
-     * Check if a user can access a document
+     * Download a file with proper Content-Disposition header
      */
-    private function userCanAccessDocument($user, $document)
+    public function downloadFile(Request $request, $path)
     {
-        // If document is public, anyone can access
-        if ($document->is_public) {
-            return true;
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
         }
         
-        // If user is document owner
-        if ($user->id === $document->user_id) {
-            return true;
+        // Normalize the path
+        $path = ltrim($path, '/');
+        
+        // Get the full path based on the relative path
+        if (strpos($path, 'public/') === 0) {
+            // Public storage
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'private/') === 0) {
+            // If path already starts with 'private/', use it directly
+            $fullPath = storage_path('app/' . $path);
+        } else if (strpos($path, 'uploads/') === 0) {
+            // If path starts with 'uploads/', add 'private/' prefix once
+            $fullPath = storage_path('app/private/' . $path);
+        } else {
+            // For other paths, add 'private/' prefix
+            $fullPath = storage_path('app/private/' . $path);
         }
         
-        // If user is admin or moderator
+        if (!File::exists($fullPath)) {
+            Log::warning('Download file not found', ['path' => $path, 'fullPath' => $fullPath]);
+            return response()->json(['error' => 'File not found'], 404);
+        }
+        
+        // Check access permissions
+        $canAccess = $this->checkFileAccess($request->user(), $path);
+        
+        if (!$canAccess) {
+            Log::warning('Unauthorized file download attempt', [
+                'path' => $path, 
+                'user_id' => Auth::id()
+            ]);
+            return response()->json(['error' => 'Unauthorized access'], 403);
+        }
+        
+        // Get a more descriptive filename for download
+        $fileName = $this->getDisplayFilename($path);
+        $mimeType = File::mimeType($fullPath);
+        
+        // Increment download count if it's a document
+        $this->incrementDownloadCount($path);
+        
+        return response()->download($fullPath, $fileName, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"'
+        ]);
+    }
+    
+    /**
+     * Check if a user can access a file
+     */
+    private function checkFileAccess($user, $path)
+    {
+        // Admin and moderators can access all files
         if ($user->hasRole(['admin', 'moderator'])) {
             return true;
         }
         
-        // If document belongs to a group and user is member of that group
-        if ($document->group_id) {
-            return $user->groups()->where('group_id', $document->group_id)->exists();
+        // Public files are accessible to all authenticated users
+        if (strpos($path, 'public/') === 0) {
+            return true;
         }
         
+        // Normalize path for comparisons - remove 'private/' prefix if it exists
+        $normalizedPath = $path;
+        if (strpos($normalizedPath, 'private/') === 0) {
+            $normalizedPath = substr($normalizedPath, 8); // Remove 'private/' prefix
+        }
+        
+        // For post attachments - search with all possible path variations
+        if (strpos($normalizedPath, 'uploads/') === 0 && strpos($normalizedPath, 'post_attachment') !== false) {
+            // Find the attachment by file path - try both with and without private/ prefix
+            $attachment = PostAttachment::where(function($query) use ($path, $normalizedPath) {
+                $query->where('file_path', $path)
+                      ->orWhere('file_path', 'private/' . $normalizedPath)
+                      ->orWhere('file_path', $normalizedPath);
+            })->first();
+                
+            if ($attachment) {
+                // Owner can access
+                if ($attachment->post->user_id === $user->id) {
+                    return true;
+                }
+                
+                // Group members can access group post attachments
+                if ($attachment->post->group_id) {
+                    $groupMember = $user->groups()
+                        ->where('group_id', $attachment->post->group_id)
+                        ->exists();
+                    
+                    if ($groupMember) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // For documents - search with all possible path variations
+        if (strpos($normalizedPath, 'uploads/') === 0 && strpos($normalizedPath, 'document') !== false) {
+            // Try to find the document by path - try both with and without private/ prefix
+            $document = Document::where(function($query) use ($path, $normalizedPath) {
+                $query->where('file_path', $path)
+                      ->orWhere('file_path', 'private/' . $normalizedPath)
+                      ->orWhere('file_path', $normalizedPath);
+            })->first();
+                
+            if ($document) {
+                // Document owner can access
+                if ($document->user_id === $user->id) {
+                    return true;
+                }
+                
+                // Approved documents are accessible to all
+                if ($document->is_approved) {
+                    return true;
+                }
+                
+                // Group documents are accessible to group members
+                if ($document->group_id) {
+                    $groupMember = $user->groups()
+                        ->where('group_id', $document->group_id)
+                        ->exists();
+                    
+                    if ($groupMember) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Check if the file is associated with a FileUpload record
+        $fileUpload = FileUpload::where(function($query) use ($path, $normalizedPath) {
+            $query->where('file_path', $path)
+                  ->orWhere('file_path', 'private/' . $normalizedPath)
+                  ->orWhere('file_path', $normalizedPath);
+        })->first();
+            
+        if ($fileUpload) {
+            // Owner can access their own files
+            if ($fileUpload->user_id === $user->id) {
+                return true;
+            }
+            
+            // If it's a completed upload and associated with a public resource
+            if ($fileUpload->status === 'completed' && $fileUpload->uploadable_type) {
+                if ($fileUpload->uploadable_type === 'document') {
+                    $document = $fileUpload->uploadable;
+                    if ($document && $document->is_approved) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // By default, deny access
         return false;
+    }
+    
+    /**
+     * Try to get a more descriptive filename for the browser
+     */
+    private function getDisplayFilename($path)
+    {
+        // Default to the basename of the path
+        $fileName = basename($path);
+        
+        // Normalize path
+        $normalizedPath = $path;
+        if (strpos($normalizedPath, 'private/') === 0) {
+            $normalizedPath = substr($normalizedPath, 8);
+        }
+        
+        // For post attachments
+        $attachment = PostAttachment::where(function($query) use ($path, $normalizedPath) {
+            $query->where('file_path', $path)
+                  ->orWhere('file_path', 'private/' . $normalizedPath)
+                  ->orWhere('file_path', $normalizedPath);
+        })->first();
+            
+        if ($attachment && $attachment->file_name) {
+            return $attachment->file_name;
+        }
+        
+        // For documents
+        $document = Document::where(function($query) use ($path, $normalizedPath) {
+            $query->where('file_path', $path)
+                  ->orWhere('file_path', 'private/' . $normalizedPath)
+                  ->orWhere('file_path', $normalizedPath);
+        })->first();
+            
+        if ($document && $document->file_name) {
+            return $document->file_name;
+        }
+        
+        // For file uploads
+        $fileUpload = FileUpload::where(function($query) use ($path, $normalizedPath) {
+            $query->where('file_path', $path)
+                  ->orWhere('file_path', 'private/' . $normalizedPath)
+                  ->orWhere('file_path', $normalizedPath);
+        })->first();
+            
+        if ($fileUpload && $fileUpload->original_filename) {
+            return $fileUpload->original_filename;
+        }
+        
+        return $fileName;
+    }
+    
+    /**
+     * Increment download count for documents
+     */
+    private function incrementDownloadCount($path)
+    {
+        // Normalize path
+        $normalizedPath = $path;
+        if (strpos($normalizedPath, 'private/') === 0) {
+            $normalizedPath = substr($normalizedPath, 8);
+        }
+        
+        $document = Document::where(function($query) use ($path, $normalizedPath) {
+            $query->where('file_path', $path)
+                  ->orWhere('file_path', 'private/' . $normalizedPath)
+                  ->orWhere('file_path', $normalizedPath);
+        })->first();
+            
+        if ($document) {
+            $document->increment('download_count');
+        }
     }
 }

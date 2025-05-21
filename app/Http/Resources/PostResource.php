@@ -17,6 +17,7 @@ class PostResource extends JsonResource
         return [
             'id' => $this->id,
             'content' => $this->content,
+            'title' => $this->title,  // Explicitly include title
             'user_id' => $this->user_id,
             'group_id' => $this->group_id,
             'is_pinned' => $this->is_pinned,
@@ -27,11 +28,23 @@ class PostResource extends JsonResource
             // Include related data
             'author' => new UserResource($this->whenLoaded('author')),
             'group' => new GroupResource($this->whenLoaded('group')),
-            'attachments' => AttachmentResource::collection($this->whenLoaded('attachments')),
+            'attachments' => $this->when($this->relationLoaded('attachments'), function () {
+                return $this->attachments->map(function ($attachment) {
+                    return [
+                        'id' => $attachment->id,
+                        'file_name' => $attachment->file_name,
+                        'file_size' => $attachment->file_size,
+                        'file_type' => $attachment->file_type,
+                        'file_path' => $attachment->file_path,
+                        'file_url' => $attachment->getFileUrlAttribute(),
+                        'created_at' => $attachment->created_at,
+                    ];
+                });
+            }),
             
             // Include counts
-            'comments_count' => $this->when(isset($this->comments_count), $this->comments_count),
-            'likes_count' => $this->when(isset($this->likes_count), $this->likes_count),
+            'comments_count' => $this->whenCounted('comments'),
+            'likes_count' => $this->whenCounted('likes'),
             
             // User specific attributes
             'is_liked' => $this->when(isset($this->is_liked), $this->is_liked),
