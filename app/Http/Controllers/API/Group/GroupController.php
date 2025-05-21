@@ -309,11 +309,15 @@ class GroupController extends Controller
             
             return response()->json(['message' => 'Join request sent successfully']);
         } else {
-            // Add user as a member
-            $group->members()->create([
-                'user_id' => $request->user()->id,
+            // Add user as a member using attach instead of create
+            $group->members()->attach($request->user()->id, [
                 'role' => 'member',
+                'status' => 'approved',
+                'joined_at' => now(),
             ]);
+            
+            // Update member count
+            $group->increment('member_count');
             
             return response()->json(['message' => 'Joined group successfully']);
         }

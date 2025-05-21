@@ -64,35 +64,76 @@ class HomeController extends Controller
     public function getFreeDocuments(Request $request)
     {
         try {
-            // Get documents from the database, ordered by download count
-            $documents = Document::free()
-                ->approved()
+            Log::info('Fetching free documents for homepage');
+            
+            // First try to get any documents from the database, with less strict filters
+            $documents = Document::where(function($query) {
+                    $query->where('status', 'approved')
+                         ->orWhere('is_approved', true);
+                })
                 ->orderBy('download_count', 'desc')
                 ->take(6)
                 ->get();
-
-            // If no documents found, return dummy data
+            
+            Log::info('Initial document query returned: ' . $documents->count() . ' documents');
+                
+            // If we have no documents at all, try an even less strict query
             if ($documents->isEmpty()) {
+                $documents = Document::orderBy('created_at', 'desc')
+                    ->take(6)
+                    ->get();
+                    
+                Log::info('Fallback document query returned: ' . $documents->count() . ' documents');
+            }
+
+            // Ensure we have data to show
+            if ($documents->isEmpty()) {
+                // Create document icons if missing for the dummy data
+                $this->ensureDirectoriesExist();
+                $this->createDummyImagesIfMissing('documents', [
+                    'doc.png', 'pdf.png', 'ppt.png', 'txt.png', 'xls.png', 'zip.png'
+                ]);
+                
+                Log::warning('No documents found in database, returning dummy data');
+                // Return dummy documents as a last resort
                 return response()->json([
                     'success' => true,
                     'data' => $this->getDummyDocuments(),
                 ]);
             }
 
+            Log::info('Successfully retrieved ' . $documents->count() . ' documents from the database');
+            
+            // Map the document data for the response
+            $documentData = $documents->map(function ($document) {
+                return [
+                    'id' => $document->id,
+                    'title' => $document->title ?? 'Untitled Document',
+                    'description' => $document->description ?? 'No description available',
+                    'thumbnail' => $document->thumbnail_url, // Using the accessor
+                    'downloads' => $document->download_count ?? 0,
+                    'file_type' => $document->file_type ?? 'unknown',
+                    'course_code' => $document->course_code,
+                    'subject' => $document->subject,
+                    'view_count' => $document->view_count ?? 0,
+                    'average_rating' => $document->getAverageRatingAttribute() ?? 0,
+                    'is_official' => $document->is_official ?? false,
+                    'created_at' => $document->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $document->updated_at->format('Y-m-d H:i:s'),
+                    'download_url' => url('/api/documents/'.$document->id.'/download'),
+                    'view_url' => url('/api/documents/'.$document->id.'/view'),
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $documents->map(function ($document) {
-                    return [
-                        'id' => $document->id,
-                        'title' => $document->title,
-                        'description' => $document->description,
-                        'thumbnail' => $document->thumbnail_url, // Using the accessor
-                        'downloads' => $document->download_count,
-                    ];
-                }),
+                'data' => $documentData,
             ]);
         } catch (\Exception $e) {
             Log::error('Error in getFreeDocuments: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
+            // Return dummy documents in case of error
             return response()->json([
                 'success' => true,
                 'data' => $this->getDummyDocuments(),

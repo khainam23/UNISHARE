@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\Admin\AdminGroupController;
 use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\Auth\PasswordResetController;
 use App\Http\Controllers\API\Admin\AdminDocumentController;
@@ -255,26 +256,39 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // API cho quản trị viên
     Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
-        // User management routes
-        Route::get('/users', [UserManagementController::class, 'index']);
-        Route::get('/users/{id}', [UserManagementController::class, 'show']);
-        Route::put('/users/{id}', [UserManagementController::class, 'update']);
-        Route::put('/users/{id}/role', [UserManagementController::class, 'updateRole']);
-        Route::put('/users/{id}/password', [UserManagementController::class, 'updatePassword']);
-        Route::post('/users/{id}/ban', [UserManagementController::class, 'ban']);
-        Route::post('/users/{id}/unban', [UserManagementController::class, 'unban']);
-        Route::delete('/users/{id}', [UserManagementController::class, 'destroy']);
-        Route::get('/roles', [UserManagementController::class, 'roles']);
-        
         // Statistics routes
         Route::get('/statistics/overview', [StatisticsController::class, 'overview']);
         Route::get('/statistics/users', [StatisticsController::class, 'users']);
+        Route::get('/statistics/documents', [StatisticsController::class, 'documents']);
+        Route::get('/statistics/posts', [StatisticsController::class, 'posts']);
+        Route::get('/statistics/groups', [StatisticsController::class, 'groups']);
+        Route::get('/statistics/reports', [StatisticsController::class, 'reports']);
+        
+        // User management routes
+        Route::get('/users', [UserManagementController::class, 'index']);
+        Route::get('/users/{user}', [UserManagementController::class, 'show']);
+        Route::put('/users/{user}/role', [UserManagementController::class, 'updateRole']);
+        Route::post('/users/{user}/ban', [UserManagementController::class, 'banUser']);
+        Route::post('/users/{user}/unban', [UserManagementController::class, 'unbanUser']);
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy']);
         
         // Document management routes
         Route::get('/documents', [AdminDocumentController::class, 'index']);
+        Route::get('/documents/statistics', [AdminDocumentController::class, 'statistics']);
         Route::get('/documents/{document}', [AdminDocumentController::class, 'show']);
         Route::put('/documents/{document}', [AdminDocumentController::class, 'update']);
         Route::delete('/documents/{document}', [AdminDocumentController::class, 'destroy']);
+        Route::post('/documents/{document}/approve', [AdminDocumentController::class, 'approve']);
+        Route::post('/documents/{document}/reject', [AdminDocumentController::class, 'reject']);
+        
+        // Group management routes
+        Route::get('/groups', [AdminGroupController::class, 'index']);
+        Route::get('/groups/statistics', [AdminGroupController::class, 'statistics']);
+        Route::get('/groups/{group}', [AdminGroupController::class, 'show']);
+        Route::get('/groups/{group}/members', [AdminGroupController::class, 'members']);
+        Route::delete('/groups/{group}/members/{user}', [AdminGroupController::class, 'removeMember']);
+        Route::put('/groups/{group}', [AdminGroupController::class, 'update']);
+        Route::delete('/groups/{group}', [AdminGroupController::class, 'destroy']);
     });
 
     // Admin document management routes
