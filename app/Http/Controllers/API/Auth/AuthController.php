@@ -180,8 +180,29 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        // Xóa token hiện tại
-        $request->user()->currentAccessToken()->delete();
+        // Get the user before logging out
+        $user = $request->user();
+        
+        // Log the logout attempt
+        Log::info('User logout', [
+            'user_id' => $user ? $user->id : null,
+            'email' => $user ? $user->email : null
+        ]);
+        
+        // Revoke all tokens for this user instead of just the current one
+        if ($user) {
+            $user->tokens()->delete();
+        }
+        
+        // Clear the session data if using session
+        if (session()->has('auth_user')) {
+            session()->forget('auth_user');
+        }
+        session()->flush();
+        
+        // Invalidate and regenerate the session ID
+        session()->invalidate();
+        session()->regenerate();
 
         return response()->json([
             'message' => 'Đăng xuất thành công',

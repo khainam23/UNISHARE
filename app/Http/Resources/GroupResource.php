@@ -30,7 +30,7 @@ class GroupResource extends JsonResource
                 return [
                     'id' => $this->creator->id,
                     'name' => $this->creator->name,
-                    'avatar' => $this->creator->avatar ? url('storage/' . $this->creator->avatar) : null,
+                    'avatar' => $this->creator->avatar ? (strpos($this->creator->avatar, 'http') === 0 ? $this->creator->avatar : url('storage/' . $this->creator->avatar)) : null,
                 ];
             }),
             // Include the user's role in this group (added dynamically)
