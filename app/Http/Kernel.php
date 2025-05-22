@@ -38,12 +38,14 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\TrackUserActivity::class,
+            \App\Http\Middleware\SessionTokenConsistencyMiddleware::class,
         ],        'api' => [
             \App\Http\Middleware\ErrorHandlingMiddleware::class, // Add error handling middleware first
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api-expanded',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\TrackUserActivity::class,
+            \App\Http\Middleware\SessionTokenConsistencyMiddleware::class,
         ],
     ];    
 

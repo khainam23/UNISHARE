@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\Report;
 use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -660,5 +661,74 @@ class DocumentController extends Controller
             'message' => "Successfully emptied trash ($count documents deleted)",
             'count' => $count
         ]);
+    }
+    
+    /**
+     * Report a document for inappropriate content
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function report(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'reason' => 'required|string|max:500',
+            'details' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Check if the document exists
+        $document = Document::find($id);
+        if (!$document) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tài liệu không tồn tại',
+            ], 404);
+        }
+
+        // Check if the user has already reported this document and has a pending report
+        $existingReport = Report::where('user_id', auth()->id())
+            ->where('reportable_type', Document::class)
+            ->where('reportable_id', $id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($existingReport) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn đã báo cáo tài liệu này và báo cáo đang được xử lý',
+            ], 422);
+        }
+
+        // Create a new report
+        $report = new Report();
+        $report->user_id = auth()->id();
+        $report->reportable_type = Document::class;
+        $report->reportable_id = $id;
+        $report->reason = $request->reason;
+        $report->details = $request->details;
+        $report->status = 'pending';
+        $report->save();
+
+        // Notify administrators and moderators about the new report
+        try {
+            broadcast(new \App\Events\ReportCreated($report))->toOthers();
+        } catch (\Exception $e) {
+            // Log the error but don't fail the request
+            \Log::error('Failed to broadcast report event: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Báo cáo tài liệu đã được gửi thành công',
+            'data' => $report,
+        ], 201);
     }
 }

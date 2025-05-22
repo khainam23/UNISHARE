@@ -88,6 +88,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('websocket/test', [WebSocketStatusController::class, 'test']);
 });
 
+// Report routes
+Route::middleware(['auth:sanctum'])->prefix('reports')->group(function () {
+    Route::post('/groups/{groupId}', [App\Http\Controllers\API\Report\GroupReportController::class, 'report']);
+    Route::get('/user', [App\Http\Controllers\API\Report\ReportController::class, 'index']);
+    Route::post('/cancel/{id}', [App\Http\Controllers\API\Report\ReportController::class, 'cancel']);
+});
+
 // Các route yêu cầu xác thực
 Route::middleware(['auth:sanctum'])->group(function () {
     // Tài liệu
@@ -114,6 +121,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/{post}', [PostController::class, 'destroy']);
         Route::post('/{post}/like', [PostController::class, 'like']);
         Route::delete('/{post}/like', [PostController::class, 'unlike']);
+        // Add new route for reporting posts
+        Route::post('/{post}/report', [PostController::class, 'report']);
 
         // Bình luận bài đăng
         Route::get('/{post}/comments', [PostCommentController::class, 'index']);
@@ -124,6 +133,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/{post}/comments/{comment}/like', [PostCommentController::class, 'like']);
         Route::delete('/{post}/comments/{comment}/like', [PostCommentController::class, 'unlike']);
         Route::get('/{post}/comments/{comment}/replies', [PostCommentController::class, 'replies']);
+        // Add new route for reporting comments
+        Route::post('/{post}/comments/{comment}/report', [PostCommentController::class, 'report']);
     });
 
     // Nhóm
@@ -250,8 +261,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/documents/{document}/approve', [ModeratorDocumentController::class, 'approve']);
         Route::post('/documents/{document}/reject', [ModeratorDocumentController::class, 'reject']);
         Route::delete('/documents/{document}', [ModeratorDocumentController::class, 'delete']);
-        Route::get('/reports', [ModeratorDocumentController::class, 'reports']);
-        Route::post('/reports/{report}/resolve', [ModeratorDocumentController::class, 'resolveReport']);
+        
+        // Add the missing statistics route
+        Route::get('/statistics/overview', [App\Http\Controllers\API\Moderator\ModeratorStatisticsController::class, 'overview']);
+        
+        // Fix route order: put statistics before {id} to avoid conflicts
+        Route::get('/reports/statistics', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'getStatistics']);
+        Route::get('/reports/all', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'getAllReports']);
+        // Regular reports routes
+        Route::get('/reports', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'index']);
+        Route::get('/reports/{id}', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'show']);
+        Route::post('/reports/{id}/resolve', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'resolve']);
     });
 
     // API cho quản trị viên
@@ -317,6 +337,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
     });
 
+    // Report routes for admin
+    Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin,moderator'])->group(function () {
+        Route::get('/reports', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'index']);
+        Route::get('/reports/{id}', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'show']);
+        Route::post('/reports/{id}/resolve', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'resolve']);
+        Route::get('/reports/statistics', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'statistics']);
+        Route::get('/reports/all', [App\Http\Controllers\API\Moderator\ReportManagementController::class, 'getAllReports']);
+    });
+
     // User history routes
     Route::prefix('user')->group(function () {
         Route::get('/history', [App\Http\Controllers\API\User\UserHistoryController::class, 'index']);
@@ -329,6 +358,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/{attachment}/url', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'getFileUrl']);
         Route::get('/{attachment}/download', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'download']);
     });
+});
+
+// Add a missing route for getting current authenticated user
+// This route is used by the frontend to check authentication status
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
 });
 
 // Thêm route test để kiểm tra API

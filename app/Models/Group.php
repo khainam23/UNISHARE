@@ -48,6 +48,15 @@ class Group extends Model
     }
 
     /**
+     * Alias for creator method to make it compatible with reportable interface.
+     * This ensures that the 'user' relationship works across all reportable types.
+     */
+    public function user()
+    {
+        return $this->creator();
+    }
+
+    /**
      * Get the members of the group.
      */
     public function members()

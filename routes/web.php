@@ -26,6 +26,11 @@ Route::get('/login', function () {
     return redirect('/#/login' . ($redirectTo ? '?redirect_to=' . urlencode($redirectTo) : ''));
 })->name('login');
 
+// Route to handle API login redirects
+Route::get('/moderator/reports/all', function() {
+    return redirect('/login?redirect_to=' . urlencode('/moderator/reports/all'));
+})->name('moderator.reports.all');
+
 // Make sure Sanctum routes are registered
 Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 

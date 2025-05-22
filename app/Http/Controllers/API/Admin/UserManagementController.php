@@ -299,7 +299,7 @@ class UserManagementController extends Controller
     /**
      * Cấm người dùng
      */
-    public function ban(Request $request, $id)
+    public function banUser(Request $request, $id)
     {
         $user = User::findOrFail($id);
         

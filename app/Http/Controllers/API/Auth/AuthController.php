@@ -191,7 +191,27 @@ class AuthController extends Controller
         
         // Revoke all tokens for this user instead of just the current one
         if ($user) {
+            // Delete all tokens for this user
             $user->tokens()->delete();
+            
+            // Delete all sessions from database for this user
+            \DB::table('sessions')->where('user_id', $user->id)->delete();
+            
+            // If using user_authentications table, update logout time
+            if (Schema::hasTable('user_authentications')) {
+                // Update authentication records that don't have logout_at yet
+                \DB::table('user_authentications')
+                    ->where('user_id', $user->id)
+                    ->whereNull('logout_at')
+                    ->update(['logout_at' => now()]);
+            }
+            
+            // Log sessions cleanup for debugging
+            Log::info('Sessions cleanup for user', [
+                'user_id' => $user->id,
+                'tokens_deleted' => true,
+                'sessions_deleted' => true
+            ]);
         }
         
         // Clear the session data if using session
