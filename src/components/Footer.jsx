@@ -44,32 +44,32 @@ const Footer = () => {
             <h5 className="text-primary mb-4">Các Danh Mục :</h5>
             <ul className="list-unstyled">
               <li className="mb-3">
-                <Link to="/about" className="text-decoration-none text-dark">
+                <Link to="/" className="text-decoration-none text-dark">
                   › Về UNISHARE
                 </Link>
               </li>
               <li className="mb-3">
-                <Link to="/support" className="text-decoration-none text-dark">
+                <Link to="/" className="text-decoration-none text-dark">
                   › Hỗ Trợ
                 </Link>
               </li>
               <li className="mb-3">
-                <Link to="/lecturers" className="text-decoration-none text-dark">
+                <Link to="/" className="text-decoration-none text-dark">
                   › Giảng Viên
                 </Link>
               </li>
               <li className="mb-3">
-                <Link to="/resources" className="text-decoration-none text-dark">
+                <Link to="/unishare-files" className="text-decoration-none text-dark">
                   › Tài Liệu
                 </Link>
               </li>
               <li className="mb-3">
-                <Link to="/groups" className="text-decoration-none text-dark">
+                <Link to="/unishare/groups" className="text-decoration-none text-dark">
                   › Group
                 </Link>
               </li>
               <li className="mb-3">
-                <Link to="/news" className="text-decoration-none text-dark">
+                <Link to="/" className="text-decoration-none text-dark">
                   › Tin Tức
                 </Link>
               </li>
@@ -96,10 +96,10 @@ const Footer = () => {
               </Link>
             </div>
             <div>
-              <Link to="/privacy" className="text-decoration-none text-dark d-block mb-3">
+              <Link to="/" className="text-decoration-none text-dark d-block mb-3">
                 › Chính sách bảo mật
               </Link>
-              <Link to="/terms" className="text-decoration-none text-dark mb-3 d-block">
+              <Link to="/" className="text-decoration-none text-dark mb-3 d-block">
                 › Điều khoản dịch vụ
               </Link>
             </div>

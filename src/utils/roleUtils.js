@@ -102,14 +102,14 @@ export const getRedirectPathForUser = (user) => {
     return '/login';
   }
   
-  // First, check for admin role - highest priority
+  // First, check for admin role - only admins go to admin dashboard
   if (isAdmin(user)) {
     return '/admin/dashboard';
   }
   
-  // Second, check for moderator role
+  // Second, check for moderator role - only moderators go to moderator dashboard
   if (isModerator(user)) {
-    return '/admin/dashboard';
+    return '/moderator/dashboard';
   }
   
   // Third, check for lecturer role

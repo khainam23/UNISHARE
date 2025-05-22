@@ -56,7 +56,7 @@ const DocumentsSection = () => {
                       </div>
                       <Card.Body className="text-center">
                         <Card.Title className="small text-truncate">{doc.title}</Card.Title>
-                        <Link to={`/documents/${doc.id}`}>
+                        <Link to={`/unishare-files/view/${doc.id}`}>
                           <Button variant="link" className="text-decoration-none">Tải xuống</Button>
                         </Link>
                       </Card.Body>

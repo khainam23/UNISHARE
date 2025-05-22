@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Card, Button, Dropdown, Badge, Modal, Form, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { BsThreeDots, BsHeart, BsHeartFill, BsChat, BsPin, BsPinFill, BsPencil, BsTrash } from 'react-icons/bs';
+import { BsThreeDots, BsHeart, BsHeartFill, BsChat, BsPin, BsPinFill, BsPencil, BsTrash, BsFlag } from 'react-icons/bs';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import PostComments from './PostComments';
-import { postService, authService } from '../../services';
+import { postService, authService, reportService } from '../../services';
 import defaultAvatar from '../../assets/avatar-1.png';
 import PostAttachment from './PostAttachment';
 import DeletePostModal from './DeletePostModal';
+import ReportModal from '../common/ReportModal';
 
 const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
   const [showComments, setShowComments] = useState(false);
@@ -28,6 +29,10 @@ const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
   const [editContent, setEditContent] = useState(post.content || '');
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // States for post reporting
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
 
   const handleToggleLike = async () => {
     try {
@@ -159,6 +164,29 @@ const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
     }
   };
 
+  // Function to handle post reporting
+  const handleReportPost = async (reportData) => {
+    try {
+      setIsReporting(true);
+      const response = await reportService.reportPost(post.id, reportData);
+      
+      if (response.success) {
+        setShowReportModal(false);
+        return { success: true, message: 'Báo cáo đã được gửi thành công' };
+      } else {
+        throw new Error(response.message || 'Không thể báo cáo bài viết');
+      }
+    } catch (error) {
+      console.error('Error reporting post:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Đã xảy ra lỗi khi gửi báo cáo'
+      };
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   return (
     <>
       <Card className={`post-card mb-3 ${isPinned ? 'border-primary' : ''}`}>
@@ -199,30 +227,33 @@ const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
                   </small>
                 </div>
                 
-                {(post.can_edit || post.can_delete) && (
-                  <Dropdown align="end">
-                    <Dropdown.Toggle variant="link" className="p-0 text-dark no-arrow" id={`post-options-${post.id}`}>
-                      <BsThreeDots />
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu>
-                      {post.can_edit && (
-                        <Dropdown.Item onClick={() => setShowEditModal(true)}>
-                          <BsPencil className="me-2" /> Edit Post
-                        </Dropdown.Item>
-                      )}
-                      {post.can_delete && (
-                        <Dropdown.Item onClick={() => setShowDeleteModal(true)} className="text-danger">
-                          <BsTrash className="me-2" /> Delete Post
-                        </Dropdown.Item>
-                      )}
-                      {(currentUser?.roles?.includes('admin') || currentUser?.roles?.includes('moderator')) && (
-                        <Dropdown.Item onClick={handleTogglePinned}>
-                          {isPinned ? 'Unpin Post' : 'Pin Post'}
-                        </Dropdown.Item>
-                      )}
-                    </Dropdown.Menu>
-                  </Dropdown>
-                )}
+                <Dropdown align="end">
+                  <Dropdown.Toggle variant="link" className="p-0 text-dark no-arrow" id={`post-options-${post.id}`}>
+                    <BsThreeDots />
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    {post.can_edit && (
+                      <Dropdown.Item onClick={() => setShowEditModal(true)}>
+                        <BsPencil className="me-2" /> Edit Post
+                      </Dropdown.Item>
+                    )}
+                    {post.can_delete && (
+                      <Dropdown.Item onClick={() => setShowDeleteModal(true)} className="text-danger">
+                        <BsTrash className="me-2" /> Delete Post
+                      </Dropdown.Item>
+                    )}
+                    {(currentUser?.roles?.includes('admin') || currentUser?.roles?.includes('moderator')) && (
+                      <Dropdown.Item onClick={handleTogglePinned}>
+                        {isPinned ? 'Unpin Post' : 'Pin Post'}
+                      </Dropdown.Item>
+                    )}
+                    {currentUser && currentUser.id !== post.user_id && (
+                      <Dropdown.Item onClick={() => setShowReportModal(true)} className="text-warning">
+                        <BsFlag className="me-2" /> Report Post
+                      </Dropdown.Item>
+                    )}
+                  </Dropdown.Menu>
+                </Dropdown>
               </div>
             </div>
           </div>
@@ -334,6 +365,16 @@ const PostItem = ({ post, groupContext, onLike, onDelete, onUpdate }) => {
           </Form>
         </Modal.Body>
       </Modal>
+
+      {/* Report Post Modal */}
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        onSubmit={handleReportPost}
+        isLoading={isReporting}
+        title="Report Post"
+        contentType="post"
+      />
     </>
   );
 };

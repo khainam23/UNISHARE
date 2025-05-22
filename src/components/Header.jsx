@@ -304,7 +304,7 @@ const Header = () => {
                           {searchResults.courses.map(course => (
                             <li key={course.id} className="py-1">
                               <Link 
-                                to={`/courses/${course.id}`}
+                                to={`/unishare/groups/${course.id}`}
                                 className="text-decoration-none text-dark d-block"
                                 onClick={() => setShowSearch(false)}
                               >

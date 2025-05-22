@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Button, Badge, Spinner, Alert } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Spinner, Alert, Dropdown } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { BsPeopleFill, BsChatDots, BsCalendar3, BsBook, BsDoorOpen, BsExclamationTriangle } from 'react-icons/bs';
+import { BsPeopleFill, BsChatDots, BsCalendar3, BsBook, BsDoorOpen, BsExclamationTriangle, BsThreeDotsVertical } from 'react-icons/bs';
 import defaultAvatar from '../../assets/avatar-1.png';
-import { profileService, groupService } from '../../services';
+import { profileService, groupService, reportService } from '../../services';
 import LeaveGroupModal from './LeaveGroupModal';
+import ReportModal from '../common/ReportModal';
 
 const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [joiningGroup, setJoiningGroup] = useState(false);
   const [leavingGroup, setLeavingGroup] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joinRequestPending, setJoinRequestPending] = useState(false);
+  const [isGroupReported, setIsGroupReported] = useState(false); // New state for report status
   
   // Use a fallback cover style instead of requiring an image file
   const defaultCoverStyle = {
@@ -95,6 +98,22 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
     }
   };
 
+  const handleReportSubmit = async (reportData) => {
+    try {
+      const response = await reportService.reportGroup(group.id, reportData);
+      if (response.success) {
+        setIsGroupReported(true); // Set reported status on success
+      }
+      return response;
+    } catch (error) {
+      console.error("Error reporting group:", error);
+      return {
+        success: false,
+        message: 'Không thể gửi báo cáo. Vui lòng thử lại sau.'
+      };
+    }
+  };
+
   if (!group) {
     return null;
   }
@@ -123,6 +142,23 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
             >
               <i className="fas fa-edit me-1"></i> Chỉnh sửa nhóm
             </Button>
+          )}
+          
+          {!isAdmin && (
+            <Dropdown className="position-absolute top-0 end-0 m-3">
+              <Dropdown.Toggle variant="light" size="sm" id="group-options-dropdown" className="no-arrow">
+                <BsThreeDotsVertical />
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => !isGroupReported && setShowReportModal(true)} 
+                  disabled={isGroupReported}
+                >
+                  <BsExclamationTriangle className={`me-2 ${isGroupReported ? 'text-muted' : 'text-danger'}`} />
+                  {isGroupReported ? 'Đã báo cáo' : 'Báo cáo nhóm'}
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           )}
           
           <div className="group-cover-overlay"></div>
@@ -348,6 +384,10 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
             border-left: 4px solid #0dcaf0;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
           }
+          
+          .no-arrow::after {
+            display: none !important;
+          }
         `}</style>
       </Card>
       
@@ -358,6 +398,16 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
         onConfirm={handleLeaveGroup} 
         groupName={group.name}
         isLoading={leavingGroup}
+      />
+      
+      {/* Report Group Modal */}
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        onSubmit={handleReportSubmit}
+        title="Báo cáo nhóm"
+        entityName={group.name}
+        entityType="nhóm"
       />
       
       {/* Join Group Modal */}

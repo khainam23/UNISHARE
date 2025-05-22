@@ -14,6 +14,7 @@ import DocumentStatisticsCard from '../components/admin/DocumentStatisticsCard';
 import GroupStatisticsCard from '../components/admin/GroupStatisticsCard';
 import adminService from '../services/adminService';
 import authService from '../services/authService';
+import ReportManagement from '../components/admin/ReportManagement';
 
 const AdminPage = () => {
   // Get tab from URL params and navigation function
@@ -195,14 +196,32 @@ const AdminPage = () => {
       const response = await adminService.getReports();
       
       // Format reports data for our component
-      const formattedReports = response.data?.map(report => ({
-        id: report.id,
-        document: report.reportable_type === 'App\\Models\\Document' ? 
-          report.reportable?.title || 'Tài liệu đã bị xóa' : 
-          'Nội dung khác',
-        content: report.reason || 'Không có lý do cụ thể',
-        reporterEmail: report.reporter?.email || 'Không xác định'
-      })) || [];
+      let formattedReports = [];
+      
+      // Check if response has the expected structure
+      if (response && response.data) {
+        // Handle array or object response
+        const reportsData = Array.isArray(response.data) ? response.data : 
+                            (response.data.data ? response.data.data : []);
+        
+        // Safely map over the data if it's an array
+        if (Array.isArray(reportsData)) {
+          formattedReports = reportsData.map(report => ({
+            id: report.id,
+            document: report.reportable_type === 'App\\Models\\Document' ? 
+              (report.reportable?.title || 'Tài liệu đã bị xóa') : 
+              'Nội dung khác',
+            content: report.reason || 'Không có lý do cụ thể',
+            reporterEmail: report.user?.email || 'Không xác định',
+            // Add all original report data for potential use
+            originalReport: report
+          }));
+        } else {
+          console.warn('Reports data is not an array:', reportsData);
+        }
+      } else {
+        console.warn('Unexpected reports response structure:', response);
+      }
       
       setReports(formattedReports);
     } catch (err) {
@@ -212,7 +231,7 @@ const AdminPage = () => {
       setLoading(false);
       loadingRef.current.reports = false;
     }
-  }, []);
+  }, [loading]);
   
   const fetchTeachers = useCallback(async () => {
     if (loadingRef.current.teachers || loading) return;
@@ -491,140 +510,9 @@ const AdminPage = () => {
         <GroupManagement />
       )}
 
-      {/* Reports Tab Content */}
+      {/* Reports Tab Content - Replace with our new component */}
       {activeTab === 'reports' && (
-        <Card className="border-0 rounded-4 p-3">
-          <Card.Body>
-            <h5 className="mb-4">Quản Lý Báo Cáo</h5>
-            
-            {loading && !reports.length ? (
-              <div className="text-center py-4">
-                <Spinner animation="border" role="status" variant="primary">
-                  <span className="visually-hidden">Loading...</span>
-                </Spinner>
-                <p className="mt-2 text-muted">Đang tải dữ liệu báo cáo...</p>
-              </div>
-            ) : reports.length > 0 ? (
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr className="bg-light">
-                      <th 
-                        style={{ 
-                          padding: '15px', 
-                          fontSize: '16px', 
-                          fontWeight: 'normal',
-                          borderRight: '1px solid #dee2e6',
-                          backgroundColor: '#e9ecef'
-                        }}
-                      >
-                        Tài Liệu
-                      </th>
-                      <th 
-                        style={{ 
-                          padding: '15px', 
-                          fontSize: '16px', 
-                          fontWeight: 'normal',
-                          borderRight: '1px solid #dee2e6',
-                          backgroundColor: '#e9ecef'
-                        }}
-                      >
-                        Nội Dung Báo Cáo
-                      </th>
-                      <th 
-                        style={{ 
-                          padding: '15px', 
-                          fontSize: '16px', 
-                          fontWeight: 'normal',
-                          borderRight: '1px solid #dee2e6',
-                          backgroundColor: '#e9ecef'
-                        }}
-                      >
-                        Tài khoản báo cáo
-                      </th>
-                      <th 
-                        style={{ 
-                          padding: '15px', 
-                          fontSize: '16px', 
-                          fontWeight: 'normal',
-                          backgroundColor: '#e9ecef'
-                        }}
-                      >
-                        Đánh Giá
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.map((report) => (
-                      <tr key={report.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                        <td 
-                          style={{ 
-                            padding: '15px', 
-                            fontSize: '14px', 
-                            borderRight: '1px solid #dee2e6' 
-                          }}
-                        >
-                          {report.document}
-                        </td>
-                        <td 
-                          style={{ 
-                            padding: '15px', 
-                            fontSize: '14px', 
-                            borderRight: '1px solid #dee2e6' 
-                          }}
-                        >
-                          {report.content}
-                        </td>
-                        <td 
-                          style={{ 
-                            padding: '15px', 
-                            fontSize: '14px', 
-                            borderRight: '1px solid #dee2e6' 
-                          }}
-                        >
-                          {report.reporterEmail}
-                        </td>
-                        <td style={{ padding: '15px' }}>
-                          <div className="d-flex gap-2 justify-content-center">
-                            <Button 
-                              variant="light" 
-                              size="sm"
-                              className="border" 
-                              style={{ 
-                                borderRadius: '4px',
-                                padding: '4px 12px',
-                                fontSize: '14px',
-                                backgroundColor: '#f8f9fa'
-                              }}
-                              onClick={() => handleInspect(report)}
-                            >
-                              Kiểm tra
-                            </Button>
-                            <Button 
-                              variant="primary" 
-                              size="sm" 
-                              style={{ 
-                                borderRadius: '4px',
-                                padding: '4px 12px',
-                                fontSize: '14px',
-                                backgroundColor: '#253B80'
-                              }}
-                              onClick={() => handleDelete(report.id)}
-                            >
-                              Xóa
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <Alert variant="info">Không có báo cáo nào cần xử lý</Alert>
-            )}
-          </Card.Body>
-        </Card>
+        <ReportManagement />
       )}
 
       {/* Permissions Tab Content */}

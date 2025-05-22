@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Spinner, Alert, ListGroup, Image, Toast } from 'react-bootstrap';
-import { BsReply, BsTrash, BsPencil, BsCheckCircle, BsXCircle } from 'react-icons/bs';
-import { postService, authService } from '../../services';
+import { BsReply, BsTrash, BsPencil, BsCheckCircle, BsXCircle, BsFlag } from 'react-icons/bs';
+import { postService, authService, reportService } from '../../services';
 import defaultAvatar from '../../assets/avatar-1.png';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import ReportModal from '../common/ReportModal';
 
 const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
   const [comments, setComments] = useState([]);
@@ -16,10 +17,12 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
   const [showReplies, setShowReplies] = useState({});
   const currentUser = authService.getUser();
   
-  // Add toast state
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
-  // Function to show toast messages
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportingComment, setReportingComment] = useState(null);
+
   const showToast = (message, type = 'success') => {
     setToast({
       show: true,
@@ -27,7 +30,6 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
       type
     });
     
-    // Auto-hide toast after 3 seconds
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 3000);
@@ -79,15 +81,12 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
         setComment('');
         
         if (replyToComment) {
-          // If replying to a comment, refresh the replies
           fetchReplies(replyToComment.id);
           setReplyToComment(null);
         } else {
-          // If top-level comment, refresh all comments
           fetchComments();
         }
         
-        // Notify parent component
         if (onCommentAdded) {
           onCommentAdded();
         }
@@ -113,15 +112,12 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
       const response = await postService.deletePostComment(postId, commentId);
       
       if (response.success) {
-        // Remove deleted comment from UI
         setComments(prevComments => {
-          // First check if it's a top-level comment
           const isTopLevelComment = prevComments.some(c => c.id === commentId);
           
           if (isTopLevelComment) {
             return prevComments.filter(comment => comment.id !== commentId);
           } else {
-            // Must be a reply, so search through all comments' replies
             return prevComments.map(comment => {
               if (comment.replies) {
                 return {
@@ -135,12 +131,10 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
           }
         });
         
-        // Notify parent component
         if (onCommentDeleted) {
           onCommentDeleted();
         }
         
-        // Show success message
         showToast('Xóa bình luận thành công', 'success');
       } else {
         throw new Error(response.message || 'Failed to delete comment');
@@ -170,7 +164,6 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
       const response = await postService.getCommentReplies(postId, commentId);
       
       if (response.success) {
-        // Update the replies for this specific comment
         setComments(prevComments => 
           prevComments.map(comment => {
             if (comment.id === commentId) {
@@ -190,7 +183,7 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
 
   const handleSetReply = (comment) => {
     setReplyToComment(comment);
-    setComment(''); // Clear current comment text
+    setComment('');
   };
 
   const cancelReply = () => {
@@ -221,13 +214,42 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
     return null;
   };
 
+  const handleOpenReportModal = (comment) => {
+    setReportingComment(comment);
+    setShowReportModal(true);
+  };
+
+  const handleReportComment = async (reportData) => {
+    if (!reportingComment) return { success: false, message: 'No comment selected for reporting' };
+    
+    try {
+      setIsReporting(true);
+      const response = await reportService.reportComment(postId, reportingComment.id, reportData);
+      
+      if (response.success) {
+        setShowReportModal(false);
+        setReportingComment(null);
+        return { success: true, message: 'Báo cáo đã được gửi thành công' };
+      } else {
+        throw new Error(response.message || 'Không thể báo cáo bình luận');
+      }
+    } catch (error) {
+      console.error('Error reporting comment:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Đã xảy ra lỗi khi gửi báo cáo'
+      };
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   if (loading && comments.length === 0) {
     return <div className="text-center p-3"><Spinner animation="border" size="sm" /></div>;
   }
 
   return (
     <div className="post-comments">
-      {/* Toast notification */}
       <Toast 
         show={toast.show} 
         onClose={() => setToast(prev => ({ ...prev, show: false }))}
@@ -254,7 +276,6 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
 
       {error && <Alert variant="danger" className="mt-3 mb-3">{error}</Alert>}
       
-      {/* Comment Form */}
       <Form onSubmit={handleSubmit} className="mb-3">
         {replyToComment && (
           <div className="reply-indicator mb-2 p-2 bg-light rounded">
@@ -296,7 +317,6 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
         </div>
       </Form>
       
-      {/* Comments List */}
       {comments.length === 0 ? (
         <div className="text-center text-muted py-3">No comments yet</div>
       ) : (
@@ -321,7 +341,20 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
                       </div>
                     </div>
                     
-                    {renderDeleteButton(comment)}
+                    <div className="d-flex">
+                      {renderDeleteButton(comment)}
+                      
+                      {currentUser && comment.user_id !== currentUser.id && (
+                        <Button 
+                          variant="link" 
+                          className="p-0 text-warning ms-2" 
+                          onClick={() => handleOpenReportModal(comment)}
+                          title="Báo cáo bình luận"
+                        >
+                          <BsFlag size={16} />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="mt-2">{comment.content}</div>
@@ -346,7 +379,6 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
                     )}
                   </div>
                   
-                  {/* Replies */}
                   {showReplies[comment.id] && comment.replies && (
                     <div className="mt-3 ps-3 border-start">
                       {comment.replies.map(reply => (
@@ -369,7 +401,20 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
                                   </div>
                                 </div>
                                 
-                                {renderDeleteButton(reply)}
+                                <div className="d-flex">
+                                  {renderDeleteButton(reply)}
+                                  
+                                  {currentUser && reply.user_id !== currentUser.id && (
+                                    <Button 
+                                      variant="link" 
+                                      className="p-0 text-warning ms-2" 
+                                      onClick={() => handleOpenReportModal(reply)}
+                                      title="Báo cáo bình luận"
+                                    >
+                                      <BsFlag size={16} />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               
                               <div className="mt-1">{reply.content}</div>
@@ -395,6 +440,18 @@ const PostComments = ({ postId, onCommentAdded, onCommentDeleted }) => {
           ))}
         </ListGroup>
       )}
+      
+      <ReportModal
+        show={showReportModal}
+        onHide={() => {
+          setShowReportModal(false);
+          setReportingComment(null);
+        }}
+        onSubmit={handleReportComment}
+        isLoading={isReporting}
+        title="Report Comment"
+        contentType="comment"
+      />
     </div>
   );
 };

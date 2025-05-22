@@ -60,7 +60,7 @@ const CoursesSection = () => {
                           <span className="fw-bold text-primary">
                             {course.price ? `${course.price.toLocaleString()}đ` : 'Miễn phí'}
                           </span>
-                          <Link to={`/courses/${course.id}`}>
+                          <Link to={`/unishare/groups/${course.id}`}>
                             <Button variant="outline-primary" size="sm">Chi tiết</Button>
                           </Link>
                         </div>

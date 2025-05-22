@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
@@ -10,6 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
+import ModeratorPage from './pages/ModeratorPage';
 import DocumentView from './pages/DocumentView';
 import EditDocument from './pages/EditDocument';
 import GroupDetailPage from './pages/GroupDetailPage';
@@ -18,8 +19,9 @@ import SearchResultsPage from './pages/SearchResultsPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
+import { Nav, Spinner, Alert } from 'react-bootstrap';
 
-// Protected route component for admin routes
+// Protected route component for admin routes - only for admin users
 const AdminRoute = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,14 @@ const AdminRoute = ({ children }) => {
         const userData = await authService.getCurrentUser();
         setUser(userData);
 
-        if (!isAdmin(userData) && !isModerator(userData)) {
+        // Only allow admin role, redirect moderators away
+        if (!isAdmin(userData)) {
+          // If user is moderator, redirect to moderator dashboard
+          if (isModerator(userData)) {
+            navigate('/moderator/dashboard');
+            return;
+          }
+          // Otherwise redirect to home
           navigate('/');
         }
       } catch (error) {
@@ -54,7 +63,52 @@ const AdminRoute = ({ children }) => {
     return <div className="text-center p-5">Loading...</div>;
   }
 
-  return isAdmin(user) || isModerator(user) ? children : null;
+  return isAdmin(user) ? children : null;
+};
+
+// Protected route component for moderator routes - only for moderator users
+const ModeratorRoute = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        if (!authService.isLoggedIn()) {
+          navigate('/login');
+          return;
+        }
+
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+
+        // Only allow moderator role, redirect admins away
+        if (!isModerator(userData)) {
+          // If user is admin, redirect to admin dashboard
+          if (isAdmin(userData)) {
+            navigate('/admin/dashboard');
+            return;
+          }
+          // Otherwise redirect to home
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error checking user permissions:', error);
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkUser();
+  }, [navigate]);
+
+  if (loading) {
+    return <div className="text-center p-5">Loading...</div>;
+  }
+
+  return isModerator(user) ? children : null;
 };
 
 // Protected route for authenticated users
@@ -137,7 +191,8 @@ function App() {
           } />
           
           {/* General unishare routes for groups/courses */}
-          <Route path="/unishare" element={<UniSharePage />} />          <Route path="/unishare/:section" element={<UniSharePage />} />
+          <Route path="/unishare" element={<UniSharePage />} />          
+          <Route path="/unishare/:section" element={<UniSharePage />} />
           <Route path="/unishare/groups/:groupId" element={
             <ProtectedRoute>
               <GroupDetailPage />
@@ -164,6 +219,18 @@ function App() {
             <AdminRoute>
               <AdminPage />
             </AdminRoute>
+          } />
+          
+          {/* Moderator routes with protected access */}
+          <Route path="/moderator" element={
+            <ModeratorRoute>
+              <ModeratorPage />
+            </ModeratorRoute>
+          } />
+          <Route path="/moderator/:tab" element={
+            <ModeratorRoute>
+              <ModeratorPage />
+            </ModeratorRoute>
           } />
         </Routes>
       </main>

@@ -147,66 +147,119 @@ const adminService = {
   
   /**
    * Get reports with optional filters
+   * @param {Object} filters - Filter parameters
+   * @returns {Promise} - Response data in the format { success: boolean, data: { paginated_report_list } }
    */
   getReports: async (filters = {}) => {
     try {
-      // Generate cache key based on filters
-      const cacheKey = `reports-${JSON.stringify(filters)}`;
+      console.log('Fetching reports with filters:', filters);
       
-      return getCachedData(cacheKey, async () => {
-        const response = await apiRequestWithRetry('get', '/admin/reports', null, {
-          params: filters
-        });
-        
-        // Handle different response formats
-        if (response.data && response.data.data) {
-          return {
-            data: response.data.data,
-            meta: response.data.meta || null
-          };
-        } else if (response.data && Array.isArray(response.data)) {
-          return { data: response.data };
-        } else if (response.data && response.data.success) {
-          return {
-            data: response.data.data || [],
-            meta: response.data.meta || null
-          };
-        } else {
-          return { data: [] };
-        }
-      }, { ttl: 60 * 1000 }); // 1 minute cache
+      const params = {
+        ...filters,
+        page: filters.page || 1,
+        per_page: filters.per_page || 10
+      };
+      
+      const axiosResponse = await apiRequestWithRetry('get', '/admin/reports', null, {
+        params
+      });
+      
+      console.log('Raw API response from getReports (axiosResponse.data):', axiosResponse.data);
+      
+      // Assuming backend returns: { success: true, data: { current_page: 1, data: [...reports], ... } }
+      if (axiosResponse.data && typeof axiosResponse.data.success === 'boolean' && axiosResponse.data.data) {
+        // The backend response is already in the desired { success, data: { pagination_object } } format.
+        // So, we extract the success flag and the inner data (pagination object).
+        return {
+          success: axiosResponse.data.success,
+          data: axiosResponse.data.data // This is the pagination object { current_page: ..., data: [...] ... }
+        };
+      } else {
+        // Fallback if the response structure is not as expected, e.g. if backend sends only pagination object
+        console.warn('adminService.getReports: API response format was not {success, data: {pagination_obj}}. Actual payload:', axiosResponse.data);
+        // If the HTTP request was successful, we can assume success at this level.
+        // The component will then try to parse axiosResponse.data as the pagination object.
+        return {
+          success: true, 
+          data: axiosResponse.data 
+        };
+      }
+
     } catch (error) {
-      console.error("Error fetching reports:", error);
-      throw error.response ? error.response.data : error;
+      console.error("Error fetching reports in adminService:", error);
+      const errorMessage = error.response?.data?.message || 'Failed to fetch reports';
+      return { 
+        success: false, 
+        message: errorMessage,
+        // Provide a default data structure that components can safely access to prevent crashes
+        data: { data: [], current_page: 1, last_page: 1, total: 0 } 
+      };
     }
   },
-  
+
   /**
-   * Get report details
+   * Get detailed information about a report
+   * @param {Number} reportId - Report ID
+   * @returns {Promise} - Report details
    */
   getReportDetails: async (reportId) => {
     try {
       const response = await apiRequestWithRetry('get', `/admin/reports/${reportId}`);
-      return response.data.data || response.data;
+      
+      // For debugging
+      console.log('Report details response:', response);
+      
+      // Return formatted response
+      return {
+        success: true,
+        data: response.data.data || response.data
+      };
     } catch (error) {
       console.error(`Error fetching report details for ID ${reportId}:`, error);
-      throw error.response ? error.response.data : error;
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch report details'
+      };
     }
   },
-  
+
   /**
    * Resolve a report
+   * @param {Number} reportId - Report ID
+   * @param {String} action - Action to take (resolve/reject/delete)
+   * @param {String} resolutionNote - Note explaining resolution
+   * @returns {Promise} - Response data
    */
-  resolveReport: async (reportId, action, resolution_note) => {
+  resolveReport: async (reportId, action, resolutionNote) => {
     try {
       const response = await apiRequestWithRetry('post', `/admin/reports/${reportId}/resolve`, {
-        action, // 'resolve' or 'reject'
-        resolution_note
+        action,
+        resolution_note: resolutionNote
       });
       return response.data;
     } catch (error) {
       console.error(`Error resolving report ID ${reportId}:`, error);
       throw error.response ? error.response.data : error;
+    }
+  },
+
+  /**
+   * Get report statistics
+   * @returns {Promise} - Statistics data
+   */
+  getReportStatistics: async () => {
+    try {
+      const response = await apiRequestWithRetry('get', '/admin/reports/statistics');
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Error fetching report statistics:', error);
+      // Return default stats instead of throwing
+      return {
+        total: 0,
+        pending: 0,
+        resolved: 0,
+        rejected: 0
+      };
     }
   },
   

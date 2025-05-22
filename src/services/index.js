@@ -7,7 +7,9 @@ import chatService from './chatService';
 import groupService from './groupService';
 import cacheService from './cacheService';
 import postService from './postService';
+import reportService from './reportService';
 import api, { getCsrfToken, checkApiAvailability, apiRequestWithRetry } from './api';
+import moderatorService from './moderatorService';
 
 export {
   authService,
@@ -22,5 +24,7 @@ export {
   getCsrfToken,
   checkApiAvailability,
   apiRequestWithRetry,
-  profileService
+  profileService,
+  reportService,
+  moderatorService
 };

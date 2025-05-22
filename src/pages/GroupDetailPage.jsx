@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Nav, Spinner, Alert, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Nav, Spinner, Alert, Badge, Dropdown } from 'react-bootstrap';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import GroupHeader from '../components/groups/GroupHeader';
 import GroupMembers from '../components/groups/GroupMembers';
 import GroupPosts from '../components/groups/GroupPosts';
-import { profileService, authService } from '../services';
-import { BsArrowLeft, BsInfoCircle, BsPeople, BsChatDots, BsCalendar3, BsChevronLeft, BsShare } from 'react-icons/bs';
+import { profileService, authService, reportService } from '../services';
+import { BsArrowLeft, BsInfoCircle, BsPeople, BsChatDots, BsCalendar3, BsChevronLeft, BsShare, BsThreeDots, BsExclamationTriangle } from 'react-icons/bs';
+import ReportModal from '../components/common/ReportModal';
 
 const GroupDetailPage = () => {
   const { groupId } = useParams();
@@ -20,6 +21,7 @@ const GroupDetailPage = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [user, setUser] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Get current user on component mount
   useEffect(() => {
@@ -86,6 +88,20 @@ const GroupDetailPage = () => {
   // Handle tab changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+  };
+
+  // Handle group report
+  const handleReportSubmit = async (reportData) => {
+    try {
+      const response = await reportService.reportGroup(groupId, reportData);
+      return response;
+    } catch (error) {
+      console.error('Error reporting group:', error);
+      return {
+        success: false,
+        message: 'Không thể gửi báo cáo. Vui lòng thử lại sau.'
+      };
+    }
   };
 
   // Loading state with enhanced modern UI
@@ -501,27 +517,31 @@ const GroupDetailPage = () => {
                 <span className="text-truncate">{group.name}</span>
               </div>
               
-              {/* Share button with enhanced styling */}
-              <Button 
-                variant="light" 
-                className="ms-auto d-flex align-items-center share-button"
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: group.name,
-                      text: group.description || 'Tham gia nhóm với tôi!',
-                      url: window.location.href,
-                    });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Đã sao chép liên kết vào clipboard!');
-                  }
-                }}
-              >
-                <BsShare className="me-2" /> 
-                <span className="d-none d-md-inline">Chia sẻ nhóm</span>
-                <span className="d-inline d-md-none">Chia sẻ</span>
-              </Button>
+              {/* Add dropdown with report option */}
+              <div className="ms-auto d-flex align-items-center">
+                
+                {/* Share button with enhanced styling */}
+                <Button 
+                  variant="light" 
+                  className="d-flex align-items-center share-button"
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: group.name,
+                        text: group.description || 'Tham gia nhóm với tôi!',
+                        url: window.location.href,
+                      });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      alert('Đã sao chép liên kết vào clipboard!');
+                    }
+                  }}
+                >
+                  <BsShare className="me-2" /> 
+                  <span className="d-none d-md-inline">Chia sẻ nhóm</span>
+                  <span className="d-inline d-md-none">Chia sẻ</span>
+                </Button>
+              </div>
             </div>
           </Container>
           
@@ -580,6 +600,25 @@ const GroupDetailPage = () => {
               background-color: #f8f9fa;
               transform: translateY(-2px);
               box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            }
+            
+            .action-button {
+              width: 38px;
+              height: 38px;
+              padding: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.3s ease;
+            }
+            
+            .action-button:hover {
+              background-color: #f0f0f0;
+              transform: rotate(90deg);
+            }
+            
+            .action-button::after {
+              display: none !important;
             }
             
             @media (max-width: 576px) {
@@ -710,6 +749,16 @@ const GroupDetailPage = () => {
           </Card>
         </Container>
       </div>
+      
+      {/* Report Group Modal */}
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        onSubmit={handleReportSubmit}
+        title="Báo cáo nhóm"
+        entityName={group?.name}
+        entityType="nhóm"
+      />
       
       {/* Add custom CSS for the page */}
       <style jsx="true">{`

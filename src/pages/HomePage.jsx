@@ -20,13 +20,13 @@ const HomePage = () => {
       
       <FeaturesSection />
       
-      <CoursesSection />
+      <CoursesSection contentType="popular" />
       
-      <DocumentsSection />
+      <DocumentsSection contentType="free" />
       
-      <TestimonialsSection />
+      <TestimonialsSection contentType="featured" />
       
-      <BlogSection />
+      <BlogSection contentType="recent" />
       
       <Footer />
     </div>

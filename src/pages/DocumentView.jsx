@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, Spinner, Alert } from 'react-bootstrap';
-import { FaDownload, FaEye, FaEdit, FaTrash, FaArrowLeft, FaUser, FaCalendarAlt, FaFileAlt } from 'react-icons/fa';
+import { Container, Row, Col, Card, Button, Badge, Spinner, Alert, Dropdown } from 'react-bootstrap';
+import { FaDownload, FaEye, FaEdit, FaTrash, FaArrowLeft, FaUser, FaCalendarAlt, FaFileAlt, FaEllipsisV, FaExclamationTriangle } from 'react-icons/fa';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { profileService } from '../services';
+import { profileService, reportService } from '../services';
+import ReportModal from '../components/common/ReportModal';
 import './DocumentView.css';
 
 const DocumentView = () => {
@@ -14,6 +15,8 @@ const DocumentView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isDocumentReported, setIsDocumentReported] = useState(false); // New state
 
   // Fetch document details
   useEffect(() => {
@@ -100,6 +103,23 @@ const DocumentView = () => {
       setError(err.message || 'Không thể tải xuống tài liệu. Vui lòng thử lại sau.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  // Handle document report
+  const handleReportSubmit = async (reportData) => {
+    try {
+      const response = await reportService.reportDocument(id, reportData);
+      if (response.success) {
+        setIsDocumentReported(true); // Set reported status on success
+      }
+      return response;
+    } catch (error) {
+      console.error('Error reporting document:', error);
+      return {
+        success: false,
+        message: 'Không thể gửi báo cáo. Vui lòng thử lại sau.'
+      };
     }
   };
 
@@ -223,7 +243,23 @@ const DocumentView = () => {
               <FaArrowLeft className="me-2" /> Quay lại
             </Button>
             <h2 className="page-title">Chi tiết tài liệu</h2>
-            <div style={{ width: '100px' }}></div> {/* Empty div for flex spacing */}
+            <div style={{ width: '100px' }}>
+              <Dropdown align="end">
+                <Dropdown.Toggle variant="light" id="dropdown-basic" className="rounded-circle">
+                  <FaEllipsisV />
+                </Dropdown.Toggle>
+
+                <Dropdown.Menu>
+                  <Dropdown.Item 
+                    onClick={() => !isDocumentReported && setShowReportModal(true)}
+                    disabled={isDocumentReported}
+                  >
+                    <FaExclamationTriangle className={`me-2 ${isDocumentReported ? 'text-muted' : 'text-danger'}`} />
+                     {isDocumentReported ? 'Đã báo cáo' : 'Báo cáo tài liệu'}
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            </div>
           </div>
           
           <Row>
@@ -405,7 +441,15 @@ const DocumentView = () => {
             </Col>
           </Row>
           
-          {/* Related documents could be added here */}
+          {/* Report Document Modal */}
+          <ReportModal
+            show={showReportModal}
+            onHide={() => setShowReportModal(false)}
+            onSubmit={handleReportSubmit}
+            title="Báo cáo tài liệu"
+            entityName={document?.title}
+            entityType="tài liệu"
+          />
         </Container>
       </div>
       <Footer />
