@@ -285,12 +285,12 @@ const PermissionsManager = () => {
   return (
     <Card className="border-0 shadow-sm">
       <Card.Body>
-        <h4 className="mb-4">Quản Lý Phân Quyền</h4>
+        <h4 className="mb-3">Quản Lý Phân Quyền</h4>
         
         {error && <Alert variant="danger">{error}</Alert>}
         {success && <Alert variant="success">{success}</Alert>}
         
-        <div className="mb-4">
+        <div className="mb-3">
           <Form.Group>
             <Form.Label>Chọn vai trò</Form.Label>
             <Form.Select 

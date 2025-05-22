@@ -154,8 +154,22 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await authService.logout();
+      
+      // Clear all authentication data from local storage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('user');
+      
+      // Clear any other application-specific stored data
+      localStorage.removeItem('last_activity');
+      localStorage.removeItem('app_settings');
+      
+      // Reset the component state
       setIsLoggedIn(false);
       setUser(null);
+      
+      // Redirect to home page
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -229,10 +243,7 @@ const Header = () => {
               <NavDropdown.Divider />
               <NavDropdown.Item as={Link} to="/unishare-files">Tất cả tài liệu</NavDropdown.Item>
             </NavDropdown>
-            
-            <Nav.Link as={Link} to="/about">Về UniSHARE</Nav.Link>
-            <Nav.Link as={Link} to="/blog">Blog</Nav.Link>
-            <Nav.Link as={Link} to="/contact">Liên hệ</Nav.Link>
+
             
             {isLoggedIn && user && (isAdmin(user) || isModerator(user)) && (
               <Nav.Link as={Link} to="/admin" className="text-danger">

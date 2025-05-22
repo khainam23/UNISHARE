@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Form, InputGroup, Card, Spinner, Badge, Alert, Modal, Pagination } from 'react-bootstrap';
-import { FaSearch, FaEye, FaEdit, FaTrash, FaCheck, FaTimes, FaFileAlt, FaFilePdf, FaFileWord, FaFileExcel } from 'react-icons/fa';
+import { Table, Button, Form, InputGroup, Card, Spinner, Badge, Alert, Modal, Pagination, Row, Col, Dropdown } from 'react-bootstrap';
+import { FaSearch, FaEye, FaEdit, FaTrash, FaCheck, FaTimes, FaFileAlt, FaFilePdf, FaFileWord, FaFileExcel, FaEllipsisV } from 'react-icons/fa';
 import { adminService } from '../../services';
 
 const DocumentsManagement = () => {
@@ -13,7 +13,7 @@ const DocumentsManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDesc, setSortDesc] = useState(true);
-  
+
   // Modal states
   const [showViewModal, setShowViewModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -31,7 +31,7 @@ const DocumentsManagement = () => {
   const fetchDocuments = async (search = '') => {
     setLoading(true);
     setError('');
-    
+
     try {
       const params = {
         page: currentPage,
@@ -40,13 +40,13 @@ const DocumentsManagement = () => {
         sort_desc: sortDesc,
         search: search || searchTerm
       };
-      
+
       if (statusFilter !== 'all') {
         params.status = statusFilter;
       }
-      
+
       const response = await adminService.getDocuments(params);
-      
+
       setDocuments(response.data || []);
       setTotalPages(response.meta?.last_page || 1);
     } catch (err) {
@@ -74,13 +74,13 @@ const DocumentsManagement = () => {
   // File icon based on file type
   const getFileIcon = (fileType) => {
     if (!fileType) return <FaFileAlt />;
-    
+
     fileType = fileType.toLowerCase();
-    
+
     if (fileType.includes('pdf')) return <FaFilePdf className="text-danger" />;
     if (fileType.includes('word') || fileType.includes('doc')) return <FaFileWord className="text-primary" />;
     if (fileType.includes('excel') || fileType.includes('sheet') || fileType.includes('xls')) return <FaFileExcel className="text-success" />;
-    
+
     return <FaFileAlt />;
   };
 
@@ -100,11 +100,10 @@ const DocumentsManagement = () => {
   };
 
   const handleApprove = (document) => {
-    // Skip displaying modal if document is already approved
     if (document.is_approved) {
-      return; // Document is already approved, do nothing
+      return;
     }
-    
+
     setSelectedDocument(document);
     setShowApproveModal(true);
   };
@@ -123,44 +122,38 @@ const DocumentsManagement = () => {
 
   const confirmApprove = async () => {
     if (!selectedDocument) return;
-    
+
     setActionLoading(true);
-    
+
     try {
-      // Check if document is already approved
       if (selectedDocument.is_approved) {
-        // Update UI to match backend state without making API call
         setShowApproveModal(false);
         return;
       }
-      
+
       const response = await adminService.approveDocument(selectedDocument.id);
-      
-      // Update document in the local state
-      setDocuments(prevDocs => 
-        prevDocs.map(doc => 
+
+      setDocuments(prevDocs =>
+        prevDocs.map(doc =>
           doc.id === selectedDocument.id ? { ...doc, is_approved: true } : doc
         )
       );
-      
+
       setShowApproveModal(false);
     } catch (err) {
       console.error("Error approving document:", err);
-      
-      // Check if error is because document is already approved
+
       if (err.message && (
-          err.message.includes('already approved') || 
+          err.message.includes('already approved') ||
           (err.response?.data?.message && err.response.data.message.includes('already approved'))
       )) {
-        // Document is already approved, just update the UI to reflect this
-        setDocuments(prevDocs => 
-          prevDocs.map(doc => 
+        setDocuments(prevDocs =>
+          prevDocs.map(doc =>
             doc.id === selectedDocument.id ? { ...doc, is_approved: true } : doc
           )
         );
         setShowApproveModal(false);
       } else {
-        // Other error
         setError('Không thể phê duyệt tài liệu. Vui lòng thử lại sau.');
       }
     } finally {
@@ -170,24 +163,22 @@ const DocumentsManagement = () => {
 
   const confirmReject = async () => {
     if (!selectedDocument || !rejectReason) return;
-    
+
     setActionLoading(true);
-    
+
     try {
       const response = await adminService.rejectDocument(selectedDocument.id, rejectReason);
-      
-      // Update document in the local state
-      setDocuments(prevDocs => 
-        prevDocs.map(doc => 
+
+      setDocuments(prevDocs =>
+        prevDocs.map(doc =>
           doc.id === selectedDocument.id ? { ...doc, is_approved: false } : doc
         )
       );
-      
+
       setShowRejectModal(false);
     } catch (err) {
       console.error("Error rejecting document:", err);
-      
-      // Check if we have a response with a message in the error
+
       if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
@@ -200,17 +191,16 @@ const DocumentsManagement = () => {
 
   const confirmDelete = async () => {
     if (!selectedDocument) return;
-    
+
     setActionLoading(true);
-    
+
     try {
       await adminService.deleteDocument(selectedDocument.id, deleteReason);
-      
-      // Remove document from the local state
-      setDocuments(prevDocs => 
+
+      setDocuments(prevDocs =>
         prevDocs.filter(doc => doc.id !== selectedDocument.id)
       );
-      
+
       setShowDeleteModal(false);
     } catch (err) {
       console.error("Error deleting document:", err);
@@ -224,16 +214,14 @@ const DocumentsManagement = () => {
     if (totalPages <= 1) return null;
 
     const items = [];
-    const maxVisible = 5; // Maximum number of page links to show
+    const maxVisible = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let endPage = Math.min(totalPages, startPage + maxVisible - 1);
 
-    // Adjust start page if end page is at maximum
     if (endPage === totalPages) {
       startPage = Math.max(1, endPage - maxVisible + 1);
     }
 
-    // Add first page if not visible
     if (startPage > 1) {
       items.push(
         <Pagination.Item key={1} onClick={() => setCurrentPage(1)}>
@@ -245,7 +233,6 @@ const DocumentsManagement = () => {
       }
     }
 
-    // Add visible page links
     for (let i = startPage; i <= endPage; i++) {
       items.push(
         <Pagination.Item 
@@ -258,7 +245,6 @@ const DocumentsManagement = () => {
       );
     }
 
-    // Add last page if not visible
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
         items.push(<Pagination.Ellipsis key="ellipsis-end" />);
@@ -285,6 +271,129 @@ const DocumentsManagement = () => {
     );
   };
 
+  const renderActionButtons = (doc) => {
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      return (
+        <Dropdown align="end">
+          <Dropdown.Toggle variant="light" size="sm" id={`dropdown-${doc.id}`} className="btn-icon">
+            <FaEllipsisV />
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            <Dropdown.Item onClick={() => handleView(doc)}>
+              <FaEye className="me-2" /> Xem
+            </Dropdown.Item>
+            
+            {!doc.is_approved && (
+              <Dropdown.Item onClick={() => handleApprove(doc)}>
+                <FaCheck className="me-2" /> Phê duyệt
+              </Dropdown.Item>
+            )}
+            
+            <Dropdown.Item onClick={() => handleReject(doc)}>
+              <FaTimes className="me-2" /> Từ chối
+            </Dropdown.Item>
+            
+            <Dropdown.Item onClick={() => handleDelete(doc)} className="text-danger">
+              <FaTrash className="me-2" /> Xóa
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown>
+      );
+    }
+
+    return (
+      <div className="d-flex justify-content-center">
+        <Button 
+          variant="light" 
+          size="sm" 
+          className="me-1" 
+          title="Xem"
+          onClick={() => handleView(doc)}
+        >
+          <FaEye />
+        </Button>
+        
+        {!doc.is_approved && (
+          <Button 
+            variant="success" 
+            size="sm" 
+            className="me-1" 
+            title="Phê duyệt"
+            onClick={() => handleApprove(doc)}
+          >
+            <FaCheck />
+          </Button>
+        )}
+        
+        <Button 
+          variant="warning" 
+          size="sm" 
+          className="me-1" 
+          title="Từ chối"
+          onClick={() => handleReject(doc)}
+        >
+          <FaTimes />
+        </Button>
+        
+        <Button 
+          variant="danger" 
+          size="sm" 
+          title="Xóa"
+          onClick={() => handleDelete(doc)}
+        >
+          <FaTrash />
+        </Button>
+      </div>
+    );
+  };
+
+  const renderMobileDocumentCard = (doc) => {
+    return (
+      <Card className="mb-3" key={doc.id}>
+        <Card.Body>
+          <div className="d-flex justify-content-between align-items-start">
+            <div className="d-flex align-items-center mb-2">
+              <div className="me-2" style={{ fontSize: '24px' }}>
+                {getFileIcon(doc.file_type)}
+              </div>
+              <div>
+                <h6 className="mb-0">{doc.title}</h6>
+                <small className="text-muted">{doc.subject || 'Không có môn học'}</small>
+              </div>
+            </div>
+            <div>
+              {renderActionButtons(doc)}
+            </div>
+          </div>
+          
+          <div className="mt-2">
+            <Row className="g-2 text-muted small">
+              <Col xs={6}>
+                <strong>Người đăng:</strong> {doc.user ? doc.user.name : 'Không xác định'}
+              </Col>
+              <Col xs={6}>
+                <strong>Trạng thái:</strong>{' '}
+                {doc.is_approved ? (
+                  <Badge bg="success">Đã duyệt</Badge>
+                ) : (
+                  <Badge bg="warning" text="dark">Chờ duyệt</Badge>
+                )}
+                {doc.is_official && (
+                  <Badge bg="info" className="ms-1">Chính thức</Badge>
+                )}
+              </Col>
+              <Col xs={6}>
+                <strong>Ngày tạo:</strong> {new Date(doc.created_at).toLocaleDateString()}
+              </Col>
+            </Row>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  };
+
   return (
     <div className="document-management-container">
       <h4 className="mb-4">Quản Lý Tài Liệu</h4>
@@ -293,53 +402,57 @@ const DocumentsManagement = () => {
       
       <Card className="mb-4 border-0 shadow-sm">
         <Card.Body>
-          <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
-            {/* Search bar */}
-            <Form className="d-flex mb-2 mb-md-0" onSubmit={handleSearch} style={{ maxWidth: '400px' }}>
-              <InputGroup>
-                <Form.Control
-                  type="text"
-                  placeholder="Tìm kiếm tài liệu..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Button variant="primary" type="submit">
-                  <FaSearch />
-                </Button>
-              </InputGroup>
-            </Form>
+          <Row className="g-3">
+            <Col xs={12} md={6}>
+              <Form className="d-flex" onSubmit={handleSearch}>
+                <InputGroup>
+                  <Form.Control
+                    type="text"
+                    placeholder="Tìm kiếm tài liệu..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <Button variant="primary" type="submit">
+                    <FaSearch />
+                  </Button>
+                </InputGroup>
+              </Form>
+            </Col>
             
-            {/* Filters */}
-            <div className="d-flex">
-              <Form.Select 
-                className="me-2" 
-                style={{ width: 'auto' }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="approved">Đã duyệt</option>
-                <option value="pending">Chờ duyệt</option>
-              </Form.Select>
-              
-              <Form.Select 
-                style={{ width: 'auto' }}
-                value={`${sortBy}-${sortDesc ? 'desc' : 'asc'}`}
-                onChange={(e) => {
-                  const [newSortBy, direction] = e.target.value.split('-');
-                  setSortBy(newSortBy);
-                  setSortDesc(direction === 'desc');
-                }}
-              >
-                <option value="created_at-desc">Mới nhất</option>
-                <option value="created_at-asc">Cũ nhất</option>
-                <option value="title-asc">Tên (A-Z)</option>
-                <option value="title-desc">Tên (Z-A)</option>
-                <option value="downloads-desc">Lượt tải (cao-thấp)</option>
-                <option value="views-desc">Lượt xem (cao-thấp)</option>
-              </Form.Select>
-            </div>
-          </div>
+            <Col xs={12} md={6}>
+              <Row className="g-2">
+                <Col xs={6}>
+                  <Form.Select 
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-100"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="approved">Đã duyệt</option>
+                    <option value="pending">Chờ duyệt</option>
+                  </Form.Select>
+                </Col>
+                <Col xs={6}>
+                  <Form.Select 
+                    value={`${sortBy}-${sortDesc ? 'desc' : 'asc'}`}
+                    onChange={(e) => {
+                      const [newSortBy, direction] = e.target.value.split('-');
+                      setSortBy(newSortBy);
+                      setSortDesc(direction === 'desc');
+                    }}
+                    className="w-100"
+                  >
+                    <option value="created_at-desc">Mới nhất</option>
+                    <option value="created_at-asc">Cũ nhất</option>
+                    <option value="title-asc">Tên (A-Z)</option>
+                    <option value="title-desc">Tên (Z-A)</option>
+                    <option value="downloads-desc">Lượt tải (cao-thấp)</option>
+                    <option value="views-desc">Lượt xem (cao-thấp)</option>
+                  </Form.Select>
+                </Col>
+              </Row>
+            </Col>
+          </Row>
         </Card.Body>
       </Card>
       
@@ -350,14 +463,16 @@ const DocumentsManagement = () => {
         </div>
       ) : documents.length > 0 ? (
         <>
-          <div className="table-responsive">
+          <div className="d-block d-md-none">
+            {documents.map(doc => renderMobileDocumentCard(doc))}
+          </div>
+          
+          <div className="d-none d-md-block table-responsive">
             <Table hover className="align-middle">
               <thead>
                 <tr>
                   <th>Tên tài liệu</th>
                   <th>Người đăng</th>
-                  <th>Kích thước</th>
-                  <th>Lượt tải</th>
                   <th>Trạng thái</th>
                   <th>Ngày tạo</th>
                   <th className="text-center">Thao tác</th>
@@ -368,7 +483,7 @@ const DocumentsManagement = () => {
                   <tr key={doc.id}>
                     <td>
                       <div className="d-flex align-items-center">
-                        <div className="file-icon me-2">
+                        <div className="me-2" style={{ width: '40px', height: '40px' }}>
                           {getFileIcon(doc.file_type)}
                         </div>
                         <div>
@@ -378,8 +493,6 @@ const DocumentsManagement = () => {
                       </div>
                     </td>
                     <td>{doc.user ? doc.user.name : 'Không xác định'}</td>
-                    <td>{formatFileSize(doc.file_size)}</td>
-                    <td>{doc.download_count || 0}</td>
                     <td>
                       {doc.is_approved ? (
                         <Badge bg="success">Đã duyệt</Badge>
@@ -391,51 +504,7 @@ const DocumentsManagement = () => {
                       )}
                     </td>
                     <td>{new Date(doc.created_at).toLocaleDateString()}</td>
-                    <td>
-                      <div className="d-flex justify-content-center">
-                        <Button 
-                          variant="light" 
-                          size="sm" 
-                          className="me-1" 
-                          title="Xem"
-                          onClick={() => handleView(doc)}
-                        >
-                          <FaEye />
-                        </Button>
-                        
-                        {!doc.is_approved && (
-                          <Button 
-                            variant="success" 
-                            size="sm" 
-                            className="me-1" 
-                            title="Phê duyệt"
-                            onClick={() => handleApprove(doc)}
-                          >
-                            <FaCheck />
-                          </Button>
-                        )}
-                        
-                        {/* Show Reject button for all documents, regardless of approval status */}
-                        <Button 
-                          variant="warning" 
-                          size="sm" 
-                          className="me-1" 
-                          title="Từ chối"
-                          onClick={() => handleReject(doc)}
-                        >
-                          <FaTimes />
-                        </Button>
-                        
-                        <Button 
-                          variant="danger" 
-                          size="sm" 
-                          title="Xóa"
-                          onClick={() => handleDelete(doc)}
-                        >
-                          <FaTrash />
-                        </Button>
-                      </div>
-                    </td>
+                    <td>{renderActionButtons(doc)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -450,12 +519,11 @@ const DocumentsManagement = () => {
         </Alert>
       )}
       
-      {/* View Document Modal */}
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg">
-        <Modal.Header closeButton>
+      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg" centered>
+        <Modal.Header closeButton className="border-bottom-0 pb-0">
           <Modal.Title>Chi tiết tài liệu</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-2">
           {selectedDocument && (
             <div>
               <h5>{selectedDocument.title}</h5>
@@ -463,55 +531,62 @@ const DocumentsManagement = () => {
               
               <hr />
               
-              <dl className="row">
-                <dt className="col-sm-3">Người đăng</dt>
-                <dd className="col-sm-9">{selectedDocument.user?.name || 'Không xác định'}</dd>
-                
-                <dt className="col-sm-3">Môn học</dt>
-                <dd className="col-sm-9">{selectedDocument.subject || 'N/A'}</dd>
-                
-                <dt className="col-sm-3">Mã môn học</dt>
-                <dd className="col-sm-9">{selectedDocument.course_code || 'N/A'}</dd>
-                
-                <dt className="col-sm-3">Loại file</dt>
-                <dd className="col-sm-9">{selectedDocument.file_type || 'N/A'}</dd>
-                
-                <dt className="col-sm-3">Kích thước</dt>
-                <dd className="col-sm-9">{formatFileSize(selectedDocument.file_size)}</dd>
-                
-                <dt className="col-sm-3">Lượt xem</dt>
-                <dd className="col-sm-9">{selectedDocument.view_count || 0}</dd>
-                
-                <dt className="col-sm-3">Lượt tải</dt>
-                <dd className="col-sm-9">{selectedDocument.download_count || 0}</dd>
-                
-                <dt className="col-sm-3">Trạng thái</dt>
-                <dd className="col-sm-9">
-                  {selectedDocument.is_approved ? (
-                    <Badge bg="success">Đã duyệt</Badge>
-                  ) : (
-                    <Badge bg="warning" text="dark">Chờ duyệt</Badge>
-                  )}
-                  {' '}
-                  {selectedDocument.is_official && (
-                    <Badge bg="info">Chính thức</Badge>
-                  )}
-                </dd>
-                
-                <dt className="col-sm-3">Ngày tạo</dt>
-                <dd className="col-sm-9">{new Date(selectedDocument.created_at).toLocaleString()}</dd>
-              </dl>
+              <Row className="g-3">
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Người đăng:</strong> {selectedDocument.user?.name || 'Không xác định'}
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Môn học:</strong> {selectedDocument.subject || 'N/A'}
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Mã môn học:</strong> {selectedDocument.course_code || 'N/A'}
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Loại file:</strong> {selectedDocument.file_type || 'N/A'}
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Lượt xem:</strong> {selectedDocument.view_count || 0}
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <div className="mb-2">
+                    <strong>Trạng thái:</strong>{' '}
+                    {selectedDocument.is_approved ? (
+                      <Badge bg="success">Đã duyệt</Badge>
+                    ) : (
+                      <Badge bg="warning" text="dark">Chờ duyệt</Badge>
+                    )}
+                    {' '}
+                    {selectedDocument.is_official && (
+                      <Badge bg="info">Chính thức</Badge>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={12}>
+                  <div className="mb-2">
+                    <strong>Ngày tạo:</strong> {new Date(selectedDocument.created_at).toLocaleString()}
+                  </div>
+                </Col>
+              </Row>
             </div>
           )}
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="border-top-0">
           <Button variant="secondary" onClick={() => setShowViewModal(false)}>
             Đóng
           </Button>
         </Modal.Footer>
       </Modal>
       
-      {/* Approve Document Modal */}
       <Modal show={showApproveModal} onHide={() => setShowApproveModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Phê duyệt tài liệu</Modal.Title>
@@ -529,7 +604,6 @@ const DocumentsManagement = () => {
         </Modal.Footer>
       </Modal>
       
-      {/* Reject Document Modal */}
       <Modal show={showRejectModal} onHide={() => setShowRejectModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Từ chối tài liệu</Modal.Title>
@@ -562,7 +636,6 @@ const DocumentsManagement = () => {
         </Modal.Footer>
       </Modal>
       
-      {/* Delete Document Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Xóa tài liệu</Modal.Title>

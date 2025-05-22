@@ -487,7 +487,7 @@ const GroupDetailPage = () => {
         <div className="bg-white border-bottom py-3 navigation-bar">
           <Container>
             <div className="d-flex align-items-center">
-              <Link to="/groups" className="text-decoration-none d-flex align-items-center back-link">
+              <Link to="/unishare" className="text-decoration-none d-flex align-items-center back-link">
                 <BsChevronLeft className="me-2" /> 
                 <span className="d-none d-sm-inline">Danh sách nhóm</span>
                 <span className="d-inline d-sm-none">Quay lại</span>

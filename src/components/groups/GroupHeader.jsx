@@ -101,7 +101,7 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
 
   return (
     <>
-      <Card className="mb-4 group-header shadow">
+      <Card className="mb-4 group-header shadow" style={{ width: '70%', margin: 'auto' }}>
         <div 
           className="group-cover position-relative"
           style={{
@@ -110,7 +110,7 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
               { backgroundImage: `url(${group.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : 
               defaultCoverStyle),
             borderTopLeftRadius: 'calc(0.375rem - 1px)',
-            borderTopRightRadius: 'calc(0.375rem - 1px)'
+            borderTopRightRadius: 'calc(0.375rem - 1px)',
           }}
         >
           {isAdmin && (

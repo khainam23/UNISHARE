@@ -238,7 +238,7 @@ const DocumentsList = () => {
               <tr key={doc.id}>
                 <td>
                   <div className="d-flex align-items-center">
-                    <div className="file-icon me-2">
+                    <div className="file-icon me-1">
                       {getFileIcon(doc.file_type)}
                     </div>
                     <div>
