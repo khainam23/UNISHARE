@@ -49,11 +49,5 @@ class AppServiceProvider extends ServiceProvider
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });
-
-        // Check if the storage link exists and create it if needed
-        if ($this->app->environment('local') && !file_exists(public_path('storage'))) {
-            $this->app->make(Illuminate\Contracts\Console\Kernel::class)
-                ->call('unishare:storage-link');
-        }
     }
 }
