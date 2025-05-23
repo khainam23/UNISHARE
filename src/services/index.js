@@ -8,6 +8,7 @@ import groupService from './groupService';
 import cacheService from './cacheService';
 import postService from './postService';
 import reportService from './reportService';
+import termsService from './termsService';
 import api, { getCsrfToken, checkApiAvailability, apiRequestWithRetry } from './api';
 import moderatorService from './moderatorService';
 
@@ -26,5 +27,6 @@ export {
   apiRequestWithRetry,
   profileService,
   reportService,
+  termsService,
   moderatorService
 };

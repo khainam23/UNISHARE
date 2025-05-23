@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Container, Row, Col, Spinner, Alert, Button } from 'react-bootstrap';
+import { Container, Row, Col, Spinner, Alert, Button, Form, InputGroup } from 'react-bootstrap';
 import { useParams, Link } from 'react-router-dom';
+import { FaSearch, FaFilter } from 'react-icons/fa';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import UnishareWelcomeBanner from '../components/unishare/UnishareWelcomeBanner';
@@ -10,7 +11,7 @@ import UnishareCreateCourseForm from '../components/unishare/UnishareCreateCours
 import UnishareMyGroups from '../components/unishare/UnishareMyGroups';
 import UnishareMessages from '../components/unishare/UnishareMessages';
 import UnishareRoleDebugger from '../components/unishare/UnishareRoleDebugger';
-import { groupService, chatService } from '../services';
+import { groupService, chatService, homeService } from '../services';
 
 // Thời gian cache (10 phút)
 const CACHE_DURATION = 10 * 60 * 1000;
@@ -20,11 +21,19 @@ const UnisharePage = () => {
   const [activeSection, setActiveSection] = useState('home');
   const [appData, setAppData] = useState({
     featuredGroups: [],
+    popularGroups: [],
     myGroups: [],
     chats: []
   });
   const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    type: '',
+    sort_by: 'member_count',
+    sort_direction: 'desc'
+  });
+  const [showFilters, setShowFilters] = useState(false);
   
   // Theo dõi thời điểm cuối cùng dữ liệu được tải
   const [lastDataFetch, setLastDataFetch] = useState(null);
@@ -56,17 +65,24 @@ const UnisharePage = () => {
         sort_direction: 'desc'
       }, true);
       
+      // Dùng API của header để tìm kiếm nhóm học
+      const searchPromise = searchQuery || (filters.type || filters.sort_by !== 'member_count' || filters.sort_direction !== 'desc') 
+        ? loadPublicGroups(searchQuery, filters) 
+        : Promise.resolve([]);
+      
       const myGroupsPromise = groupService.getUserGroups({}, true);
       
       const chatsPromise = chatService.getUserChats({}, true);
       
       // Sử dụng Promise.allSettled để đảm bảo tất cả request hoàn thành
       // Ngay cả khi một số request thất bại
-      const [featuredGroupsResult, myGroupsResult, chatsResult] = await Promise.allSettled([
-        featuredGroupsPromise,
-        myGroupsPromise,
-        chatsPromise
-      ]);
+      const [featuredGroupsResult, searchResultsResult, myGroupsResult, chatsResult] = 
+        await Promise.allSettled([
+          featuredGroupsPromise,
+          searchPromise,
+          myGroupsPromise,
+          chatsPromise
+        ]);
       
       // Xử lý kết quả featuredGroups
       let featuredGroups = [];
@@ -93,6 +109,23 @@ const UnisharePage = () => {
         console.error('Error fetching featured groups:', featuredGroupsResult.reason);
       }
       
+      // Xử lý kết quả tìm kiếm
+      let popularGroups = [];
+      if (searchResultsResult.status === 'fulfilled') {
+        console.log('Search results response:', searchResultsResult.value);
+        
+        popularGroups = searchResultsResult.value;
+        
+        // Ensure we have all needed properties for each group
+        popularGroups = popularGroups.map(group => ({
+          ...group,
+          // Make sure member_count is a number 
+          member_count: typeof group.member_count === 'number' ? group.member_count : parseInt(group.member_count) || 0
+        }));
+      } else if (searchResultsResult.status === 'rejected') {
+        console.error('Error fetching search results:', searchResultsResult.reason);
+      }
+      
       // Xử lý kết quả myGroups
       let myGroups = [];
       if (myGroupsResult.status === 'fulfilled' && myGroupsResult.value.success) {
@@ -112,12 +145,14 @@ const UnisharePage = () => {
       // Cập nhật trạng thái với tất cả dữ liệu
       setAppData({
         featuredGroups,
+        popularGroups,
         myGroups,
         chats
       });
       
       // Log to verify data
       console.log('Loaded featured groups:', featuredGroups);
+      console.log('Loaded search results:', popularGroups);
       
       // Cập nhật thời gian tải dữ liệu
       setLastDataFetch(now);
@@ -125,6 +160,7 @@ const UnisharePage = () => {
       // Kiểm tra tất cả các request có thành công không để hiển thị lỗi nếu cần
       const allSuccessful = 
         featuredGroupsResult.status === 'fulfilled' && 
+        searchResultsResult.status === 'fulfilled' && 
         myGroupsResult.status === 'fulfilled' && 
         chatsResult.status === 'fulfilled';
         
@@ -137,7 +173,45 @@ const UnisharePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [lastDataFetch]);
+  }, [lastDataFetch, filters, searchQuery]);
+
+  // Hàm tìm kiếm nhóm (dùng API từ header component)
+  const loadPublicGroups = async (query, filterOptions = {}) => {
+    try {
+      console.log('Searching groups with query:', query, 'and filters:', filterOptions);
+      
+      // Chuẩn bị tham số truy vấn
+      const queryParams = {
+        search: query,
+        sort_by: filterOptions.sort_by || 'member_count',
+        sort_direction: filterOptions.sort_direction || 'desc',
+        per_page: 9,
+        requires_approval: false
+      };
+      
+      // Thêm filter loại nhóm nếu có
+      if (filterOptions.type) {
+        queryParams.type = filterOptions.type;
+      }
+      
+      // Gọi API để tìm kiếm nhóm
+      const groupsResponse = await groupService.getAllGroups(queryParams);
+      
+      if (groupsResponse.success) {
+        return groupsResponse.data || [];
+      } else if (groupsResponse.data) {
+        return groupsResponse.data || [];
+      } else if (Array.isArray(groupsResponse)) {
+        return groupsResponse;
+      }
+      
+      console.log('Loaded groups from search:', groupsResponse);
+      return [];
+    } catch (error) {
+      console.error('Error searching groups:', error);
+      return [];
+    }
+  };
 
   // Tải dữ liệu khi component được mount hoặc khi yêu cầu làm mới
   useEffect(() => {
@@ -160,6 +234,38 @@ const UnisharePage = () => {
     // Dispatch custom event để reload dữ liệu
     window.dispatchEvent(new Event('refresh-app-data'));
   }, []);
+  
+  // Handle search submission
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchAllData(true);
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Apply filters
+  const applyFilters = () => {
+    fetchAllData(true);
+    setShowFilters(false);
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setFilters({
+      type: '',
+      sort_by: 'member_count',
+      sort_direction: 'desc'
+    });
+    setSearchQuery('');
+    fetchAllData(true);
+  };
 
   // Tối ưu hóa renderMainContent với useMemo
   const renderMainContent = useMemo(() => {
@@ -188,7 +294,7 @@ const UnisharePage = () => {
       );
     }
 
-    const { featuredGroups, myGroups, chats } = appData;
+    const { featuredGroups, popularGroups, myGroups, chats } = appData;
 
     switch (activeSection) {
       case 'create-course':
@@ -221,6 +327,125 @@ const UnisharePage = () => {
         return (
           <>
             <UnishareWelcomeBanner />
+            
+            {/* Search and Filters Section */}
+            <div className="bg-white rounded shadow-sm p-4 mb-4" style={{ border: '2px solid #b3d8f6', borderRadius: '1rem' }}>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Tìm kiếm nhóm học</h4>
+                <Button 
+                  variant="outline-primary" 
+                  className="d-flex align-items-center"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <FaFilter className="me-2" /> Bộ lọc
+                </Button>
+              </div>
+              
+              {/* Search Bar */}
+              <Form onSubmit={handleSearch} className="mb-4">
+                <InputGroup>
+                  <Form.Control
+                    placeholder="Tìm kiếm nhóm học..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <Button type="submit" variant="primary">
+                    <FaSearch /> Tìm
+                  </Button>
+                </InputGroup>
+              </Form>
+              
+              {/* Filters */}
+              {showFilters && (
+                <div className="filter-section bg-light p-3 mb-4 rounded">
+                  <h6 className="mb-3">Tùy chọn lọc</h6>
+                  <Row>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Loại nhóm</Form.Label>
+                        <Form.Select 
+                          name="type" 
+                          value={filters.type}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">Tất cả</option>
+                          <option value="course">Khóa học</option>
+                          <option value="university">Trường đại học</option>
+                          <option value="interest">Sở thích</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Sắp xếp theo</Form.Label>
+                        <Form.Select 
+                          name="sort_by" 
+                          value={filters.sort_by}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="member_count">Số thành viên</option>
+                          <option value="created_at">Ngày tạo</option>
+                          <option value="name">Tên nhóm</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Thứ tự</Form.Label>
+                        <Form.Select 
+                          name="sort_direction" 
+                          value={filters.sort_direction}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="desc">Giảm dần</option>
+                          <option value="asc">Tăng dần</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                  <div className="d-flex justify-content-end">
+                    <Button 
+                      variant="outline-secondary" 
+                      size="sm" 
+                      className="me-2"
+                      onClick={resetFilters}
+                    >
+                      Đặt lại
+                    </Button>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      onClick={applyFilters}
+                    >
+                      Áp dụng
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Search Results Section - Moved above featured groups */}
+            {searchQuery || (filters.type || filters.sort_by !== 'member_count' || filters.sort_direction !== 'desc') ? (
+              <div className="mb-4">
+                <h5 className="fw-bold mb-3" style={{ color: '#0370b7' }}>Kết quả tìm kiếm</h5>
+                {loading ? (
+                  <div className="text-center py-3">
+                    <Spinner animation="border" variant="primary" />
+                    <p className="mt-2">Đang tải danh sách nhóm...</p>
+                  </div>
+                ) : popularGroups.length > 0 ? (
+                  <UnishareCourseSection 
+                    courses={popularGroups}
+                  />
+                ) : (
+                  <Alert variant="info">
+                    Không tìm thấy nhóm học nào phù hợp với tiêu chí tìm kiếm.
+                  </Alert>
+                )}
+              </div>
+            ) : null}
+            
+            {/* Featured Groups Section - Now at the bottom */}
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Nhóm học phổ biến</h5>
               <Button
@@ -246,7 +471,7 @@ const UnisharePage = () => {
           </>
         );
     }
-  }, [activeSection, loading, error, appData, lastDataFetch, fetchAllData, handleDataUpdated]);
+  }, [activeSection, loading, error, appData, lastDataFetch, fetchAllData, handleDataUpdated, searchQuery, filters, showFilters]);
 
   // Tối ưu hóa sidebar props
   const sidebarProps = useMemo(() => ({

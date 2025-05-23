@@ -16,6 +16,8 @@ import EditDocument from './pages/EditDocument';
 import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
 import SearchResultsPage from './pages/SearchResultsPage';
+import PopularGroupsPage from './pages/PopularGroupsPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
@@ -203,6 +205,12 @@ function App() {
               <ChatPage />
             </ProtectedRoute>
           } />
+          
+          {/* Redirect popular-groups to main page */}
+          <Route path="/unishare/popular-groups" element={<Navigate to="/unishare" replace />} />
+          
+          {/* Terms of service page */}
+          <Route path="/unishare/terms" element={<TermsOfServicePage />} />
           
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

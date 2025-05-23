@@ -228,7 +228,7 @@ const Header = () => {
               <NavDropdown.Item as={Link} to="/unishare/groups?type=popular">Nhóm học phổ biến</NavDropdown.Item>
               <NavDropdown.Item as={Link} to="/unishare/groups?type=new">Nhóm học mới</NavDropdown.Item>
               {isLoggedIn && (
-                <NavDropdown.Item as={Link} to="/unishare/groups?type=my">Nhóm của tôi</NavDropdown.Item>
+                <NavDropdown.Item as={Link} to="/unishare/my-groups">Nhóm của tôi</NavDropdown.Item>
               )}
               <NavDropdown.Divider />
               <NavDropdown.Item as={Link} to="/unishare/groups">Tất cả nhóm học</NavDropdown.Item>

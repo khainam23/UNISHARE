@@ -190,17 +190,6 @@ const UnshareSidebar = ({ activeSection = 'home', hasNewMessages = false }) => {
           
           <Nav.Link
             as={Link}
-            to="/unishare/settings"
-            active={activeSection === 'settings'}
-            className={`d-flex align-items-center py-2 px-3 fw-bold ${activeSection !== 'settings' ? 'text-primary sidebar-link' : ''}`}
-            style={{ borderRadius: '0.5rem' }}
-          >
-            <FaCog className="me-2" />
-            Cài đặt
-          </Nav.Link>
-          
-          <Nav.Link
-            as={Link}
             to="/unishare/terms"
             active={activeSection === 'terms'}
             className={`d-flex align-items-center py-2 px-3 fw-bold ${activeSection !== 'terms' ? 'text-primary sidebar-link' : ''}`}
