@@ -358,6 +358,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/{attachment}/url', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'getFileUrl']);
         Route::get('/{attachment}/download', [App\Http\Controllers\API\Post\PostAttachmentController::class, 'download']);
     });
+
+    // Message attachment routes
+    Route::post('/messages/{messageId}/attachments', [App\Http\Controllers\API\Message\MessageAttachmentController::class, 'upload']);
+    Route::get('/message-attachments/{id}', [App\Http\Controllers\API\Message\MessageAttachmentController::class, 'show']);
+    Route::get('/message-attachments/{id}/download', [App\Http\Controllers\API\Message\MessageAttachmentController::class, 'download'])
+         ->name('message.attachment.download');
 });
 
 // Add a missing route for getting current authenticated user

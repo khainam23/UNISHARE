@@ -8,10 +8,13 @@ use App\Http\Resources\MessageResource;
 use App\Models\Chat;
 use App\Models\Message;
 use App\Models\FileUpload;
+use App\Models\MessageAttachment;
 use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
@@ -45,98 +48,83 @@ class MessageController extends Controller
         return MessageResource::collection($messages);
     }
     
+    /**
+     * Store a newly created message in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Chat  $chat
+     * @return \Illuminate\Http\Response
+     */
     public function store(Request $request, Chat $chat)
     {
-        $userId = $request->user()->id;
+        // Check if user is a participant
+        $isParticipant = $chat->participants()->where('user_id', $request->user()->id)->exists();
         
-        // Check if user is part of this chat
-        if (!$chat->hasActiveParticipant($userId)) {
-            return response()->json(['message' => 'You do not have permission to send messages in this chat'], 403);
+        if (!$isParticipant) {
+            return response()->json(['message' => 'You are not a participant in this chat'], 403);
         }
         
         $validator = Validator::make($request->all(), [
             'content' => 'nullable|string|max:10000',
-            'attachments.*' => 'nullable|file|max:10240', // 10MB max
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB max per file
         ]);
         
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
         
-        // Ensure at least content or attachment is provided
+        // Require either content or attachments
         if (empty($request->content) && !$request->hasFile('attachments')) {
-            return response()->json(['message' => 'Message must have content or attachment'], 422);
+            return response()->json(['message' => 'Message content or attachments are required'], 422);
         }
         
         // Create the message
-        $message = $chat->messages()->create([
-            'user_id' => $userId,
-            'content' => $request->content ?? '',
-        ]);
+        $message = new Message();
+        $message->chat_id = $chat->id;
+        $message->user_id = $request->user()->id;
+        $message->content = $request->content;
+        $message->save();
         
-        // Handle attachments if provided
-        $attachments = [];
+        // Process attachments if any
         if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $index => $file) {
-                try {
-                    $fileUpload = $this->fileUploadService->uploadFile(
-                        $file,
-                        $userId,
-                        'message_attachment'
-                    );
-                    
-                    $attachment = $message->attachments()->create([
-                        'file_name' => $file->getClientOriginalName(),
-                        'file_path' => $fileUpload->file_path,
-                        'file_size' => $file->getSize(),
-                        'file_type' => $file->getMimeType(),
-                    ]);
-                    
-                    $attachments[] = $attachment;
-                } catch (\Exception $e) {
-                    // Log the error but continue with message creation
-                    \Log::error('Failed to upload attachment: ' . $e->getMessage());
-                }
+            foreach ($request->file('attachments') as $file) {
+                $fileName = $file->getClientOriginalName();
+                $fileSize = $file->getSize();
+                $fileType = $file->getMimeType();
+                
+                // Generate a unique name for the file
+                $uniqueFileName = Str::uuid() . '_' . $fileName;
+                
+                // Store the file
+                $filePath = $file->storeAs('message_attachments', $uniqueFileName, 'public');
+                
+                // Create attachment record
+                $attachment = new MessageAttachment([
+                    'message_id' => $message->id,
+                    'file_name' => $fileName,
+                    'file_path' => $filePath,
+                    'file_size' => $fileSize,
+                    'file_type' => $fileType,
+                ]);
+                
+                $attachment->save();
             }
         }
         
-        // Update the chat's last_message_at timestamp
-        $chat->update(['last_message_at' => now()]);
+        // Update the chat's updated_at timestamp
+        $chat->touch();
         
-        // Load attachments for the message
-        $message->load(['user', 'attachments']);
+        // Load the message with user and attachments
+        $message->load('user', 'attachments');
         
-        // Broadcast the message if event broadcasting is set up
-        try {
-            event(new MessageSent($message));
-        } catch (\Exception $e) {
-            \Log::error('Failed to broadcast message: ' . $e->getMessage());
+        // Process any emoji in the content
+        if (!empty($message->content)) {
+            // Using a simple emoji processing for display
+            // In a real implementation, you might want to use a proper emoji library
         }
         
-        // Send notification to other participants
-        $otherParticipants = $chat->participants()
-            ->where('user_id', '!=', $userId)
-            ->whereNull('left_at')
-            ->get();
-            
-        foreach ($otherParticipants as $participant) {
-            try {
-                $this->notificationService->sendNotification(
-                    $participant->user_id,
-                    'new_message',
-                    "New message from {$request->user()->name}",
-                    [
-                        'chat_id' => $chat->id, 
-                        'message_id' => $message->id,
-                        'sender_name' => $request->user()->name
-                    ]
-                );
-            } catch (\Exception $e) {
-                \Log::error('Failed to send notification: ' . $e->getMessage());
-            }
-        }
-        
-        return new MessageResource($message);
+        return response()->json($message);
     }
     
     public function markAsRead(Request $request, Chat $chat)
