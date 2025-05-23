@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, Form, Button, Image, Spinner } from 'react-bootstrap';
+import { Card, Form, Button, Image, Spinner, Modal, Alert } from 'react-bootstrap';
 import { IoMdSend } from 'react-icons/io';
-import { BsPaperclip, BsEmojiSmile } from 'react-icons/bs';
+import { BsPaperclip, BsEmojiSmile, BsDownload, BsX, BsFileEarmark } from 'react-icons/bs';
 import userAvatar from '../../assets/avatar-1.png';
-import { authService } from '../../services';
+import { authService, chatService } from '../../services';
+import EmojiPicker from 'emoji-picker-react';
 
-const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMessage }) => {
+const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMessage, onMessagesRead }) => {
   const [messageInput, setMessageInput] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
@@ -13,6 +14,16 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const previousMessagesLengthRef = useRef(0);
+  
+  // New state for file attachments and emoji picker
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  
+  // File input ref
+  const fileInputRef = useRef(null);
 
   // Ensure messages is always an array
   const messagesList = Array.isArray(messages) ? messages : 
@@ -67,7 +78,30 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
     
     // Reset the messages length reference when chat changes
     previousMessagesLengthRef.current = 0;
+    
+    // Clear any selected files
+    setSelectedFiles([]);
+    setPreviewUrls([]);
   }, [chat?.id]);
+
+  // Mark messages as read when chat changes or messages are loaded
+  useEffect(() => {
+    if (chat?.id && messages.length > 0 && !loading) {
+      // Call the markAsRead function after a short delay to ensure messages are rendered
+      const timer = setTimeout(() => {
+        handleMarkAsRead();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [chat?.id, messages.length, loading]);
+
+  // Clean up object URLs when component unmounts or files change
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
 
   // Helper to check if scrolled to bottom
   const isScrolledToBottom = () => {
@@ -113,20 +147,97 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
     setShouldScrollToBottom(isAtBottom);
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!messageInput.trim()) return;
+    
+    // Don't allow empty messages without attachments
+    if (!messageInput.trim() && selectedFiles.length === 0) return;
     
     console.log('Sending message:', messageInput);
+    console.log('With attachments:', selectedFiles);
     
     // Ensure we scroll to bottom after sending a new message
     setShouldScrollToBottom(true);
     setUserScrolled(false);
     
-    if (onSendMessage) {
-      onSendMessage(messageInput);
-      setMessageInput('');
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+      
+      // Ensure we always pass a string for content, not null or undefined
+      // This helps avoid database constraint violations
+      const messageContent = messageInput || '';
+      
+      // Call parent's onSendMessage with both content and files
+      const response = await onSendMessage(messageContent, selectedFiles);
+      
+      if (response && response.success) {
+        // Clear the input and files after successful send
+        setMessageInput('');
+        setSelectedFiles([]);
+        setPreviewUrls([]);
+      } else {
+        setUploadError((response && response.message) || 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setUploadError('An error occurred while sending your message. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    // Limit the number of files (e.g., max 5)
+    if (selectedFiles.length + files.length > 5) {
+      alert('You can only attach up to 5 files per message.');
+      return;
+    }
+    
+    // Check file sizes
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      alert(`Some files are too large. Maximum size is 10MB per file.`);
+      return;
+    }
+    
+    // Validate file types - only allow PDF and DOCX
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const invalidFiles = files.filter(file => !allowedTypes.includes(file.type));
+    
+    if (invalidFiles.length > 0) {
+      alert(`Only PDF and DOCX files are allowed.`);
+      return;
+    }
+    
+    // Create preview URLs for images (won't be used for PDF/DOCX but keeping structure)
+    const newPreviewUrls = files.map(() => null);
+    
+    setSelectedFiles(prev => [...prev, ...files]);
+    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+  };
+  
+  // Remove a selected file
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    
+    // Also revoke the URL to prevent memory leaks
+    if (previewUrls[index]) {
+      URL.revokeObjectURL(previewUrls[index]);
+    }
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  // Handle emoji selection
+  const onEmojiClick = (emojiData) => {
+    setMessageInput(prev => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
   };
 
   // Format timestamp for display
@@ -134,6 +245,64 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
     if (!timestamp) return '';
     const date = new Date(timestamp);
     return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // Handle downloading an attachment
+  const handleDownloadAttachment = async (attachmentId, fileName) => {
+    try {
+      const response = await chatService.downloadAttachment(attachmentId);
+      
+      if (response.success) {
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = response.url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        URL.revokeObjectURL(response.url);
+      } else {
+        alert('Failed to download file: ' + response.message);
+      }
+    } catch (error) {
+      console.error('Error downloading attachment:', error);
+      alert('An error occurred while downloading the file.');
+    }
+  };
+
+  // Helper to check if a file is an image by MIME type
+  const isImageFile = (fileType) => {
+    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    return imageTypes.includes(fileType);
+  };
+  
+  // Helper to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Function to mark messages as read
+  const handleMarkAsRead = async () => {
+    if (!chat?.id) return;
+    
+    try {
+      const response = await chatService.markChatAsRead(chat.id);
+      
+      // Notify parent component that messages have been read
+      if (response && onMessagesRead) {
+        onMessagesRead(chat.id);
+      }
+    } catch (err) {
+      console.error('Error marking messages as read:', err);
+    }
   };
 
   return (
@@ -169,10 +338,10 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
           height: '350px',
           overflowY: 'auto',
           backgroundColor: '#f8fbff',
-          outline: 'none' // Remove focus outline
+          outline: 'none'
         }}
         onScroll={handleScroll}
-        tabIndex="-1" // Make div focusable but not in tab order
+        tabIndex="-1"
       >
         {loading ? (
           <div className="text-center py-5">
@@ -212,7 +381,68 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                   }}
                 >
-                  <div>{message.content}</div>
+                  {/* Message text content */}
+                  {message.content && <div>{message.content}</div>}
+                  
+                  {/* Message attachments */}
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="message-attachments mt-2">
+                      {message.attachments.map(attachment => (
+                        <div 
+                          key={attachment.id} 
+                          className="attachment mb-2 p-2" 
+                          style={{ 
+                            backgroundColor: isCurrentUser ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                            borderRadius: '8px',
+                          }}
+                        >
+                          {/* Image attachment preview */}
+                          {isImageFile(attachment.file_type) && (
+                            <div className="mb-1">
+                              <img 
+                                src={`/api/message-attachments/${attachment.id}/download`} 
+                                alt={attachment.file_name}
+                                style={{ 
+                                  maxWidth: '100%', 
+                                  maxHeight: '150px', 
+                                  borderRadius: '4px',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => window.open(`/api/message-attachments/${attachment.id}/download`, '_blank')}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* File attachment info */}
+                          <div className="d-flex align-items-center">
+                            <BsFileEarmark className="me-2" />
+                            <small 
+                              className="text-truncate" 
+                              style={{ 
+                                maxWidth: '150px',
+                                color: isCurrentUser ? 'rgba(255,255,255,0.9)' : 'inherit' 
+                              }}
+                            >
+                              {attachment.file_name}
+                            </small>
+                            <small className="mx-2" style={{ color: isCurrentUser ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}>
+                              {formatFileSize(attachment.file_size)}
+                            </small>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-0" 
+                              style={{ color: isCurrentUser ? 'white' : '#0370b7' }}
+                              onClick={() => handleDownloadAttachment(attachment.id, attachment.file_name)}
+                            >
+                              <BsDownload />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="text-end mt-1">
                     <small style={{ opacity: 0.7, fontSize: '0.75rem' }}>
                       {formatMessageTime(message.created_at)}
@@ -236,17 +466,86 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Selected Files Preview */}
+      {selectedFiles.length > 0 && (
+        <div className="px-3 pt-2">
+          <div className="d-flex flex-wrap gap-2">
+            {selectedFiles.map((file, index) => (
+              <div 
+                key={index} 
+                className="position-relative" 
+                style={{ 
+                  width: '60px', 
+                  height: '60px', 
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* File preview */}
+                {file.type.startsWith('image/') ? (
+                  <img 
+                    src={previewUrls[index]} 
+                    alt={file.name} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div 
+                    className="d-flex align-items-center justify-content-center"
+                    style={{ width: '100%', height: '100%', backgroundColor: '#f8f9fa' }}
+                  >
+                    <BsFileEarmark size={24} />
+                  </div>
+                )}
+                
+                {/* Remove button */}
+                <button
+                  className="position-absolute top-0 end-0 p-0 bg-dark bg-opacity-50 border-0 rounded-circle d-flex align-items-center justify-content-center"
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                  onClick={() => removeFile(index)}
+                >
+                  <BsX color="white" size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Error message */}
+      {uploadError && (
+        <div className="px-3">
+          <Alert variant="danger" className="py-2 mt-2 mb-0">
+            {uploadError}
+          </Alert>
+        </div>
+      )}
+
       {/* Input Area */}
       <Card.Footer className="bg-white p-3">
         <Form className="d-flex align-items-center" onSubmit={handleSendMessage}>
+          {/* File attachment button */}
           <Button
             variant="light"
             className="me-2"
             style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}
             type="button"
+            onClick={() => fileInputRef.current?.click()}
           >
             <BsPaperclip />
           </Button>
+          
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleFileSelect}
+            accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          />
+          
+          {/* Message input */}
           <Form.Control
             type="text"
             placeholder="Nhập tin nhắn..."
@@ -254,21 +553,45 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
           />
-          <Button
-            variant="light"
-            className="mx-2"
-            style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}
-            type="button"
-          >
-            <BsEmojiSmile />
-          </Button>
+          
+          {/* Emoji button */}
+          <div className="position-relative mx-2">
+            <Button
+              variant="light"
+              style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+              <BsEmojiSmile />
+            </Button>
+            
+            {/* Emoji picker */}
+            {showEmojiPicker && (
+              <div 
+                className="position-absolute end-0 bottom-100 mb-2"
+                style={{ zIndex: 1000 }}
+              >
+                <EmojiPicker 
+                  onEmojiClick={onEmojiClick}
+                  width={320}
+                  height={400}
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Send button */}
           <Button
             variant="primary"
             style={{ borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}
             type="submit"
-            disabled={!messageInput.trim()}
+            disabled={(!messageInput.trim() && selectedFiles.length === 0) || isUploading}
           >
-            <IoMdSend />
+            {isUploading ? (
+              <Spinner animation="border" size="sm" />
+            ) : (
+              <IoMdSend />
+            )}
           </Button>
         </Form>
       </Card.Footer>

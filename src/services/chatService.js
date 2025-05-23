@@ -243,6 +243,67 @@ const chatService = {
   },
 
   /**
+   * Send a message with attachments to a chat
+   * @param {Number} chatId - The ID of the chat
+   * @param {Object} messageData - The message data
+   * @param {Array} files - Array of files to attach
+   * @returns {Promise} Promise with sent message data
+   */
+  sendMessageWithAttachments: async (chatId, messageData, files) => {
+    try {
+      console.log(`Sending message with attachments to chat ${chatId}`);
+      
+      const formData = new FormData();
+      
+      // Always add content field, even if it's an empty string
+      // This prevents NULL values that can cause database constraint violations
+      formData.append('content', messageData.content?.trim() || '');
+      
+      // Add files
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          formData.append('attachments[]', files[i]);
+        }
+      }
+      
+      const response = await api.post(
+        `/chats/${chatId}/messages`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          }
+        }
+      );
+      
+      console.log('Message with attachments response:', response.data);
+      
+      // Ensure we return a consistent response format
+      let result;
+      if (response.data && response.data.data) {
+        result = {
+          success: true,
+          data: response.data.data
+        };
+      } else {
+        result = {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`Error sending message with attachments to chat ${chatId}:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Could not send message with attachments',
+        error: error.response?.data || error.message
+      };
+    }
+  },
+
+  /**
    * Create a new chat
    * @param {Object} chatData - The chat data
    * @returns {Promise} Promise with created chat data
@@ -294,9 +355,20 @@ const chatService = {
   markChatAsRead: async (chatId) => {
     try {
       const response = await api.post(`/chats/${chatId}/read`);
-      return response.data;
+      
+      // Return a standardized response
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: 'Chat marked as read successfully'
+      };
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      console.error(`Error marking chat ${chatId} as read:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Could not mark chat as read',
+        error: error.response?.data || error.message
+      };
     }
   },
 
@@ -457,7 +529,34 @@ const chatService = {
     } catch (error) {
       throw error.response ? error.response.data : error;
     }
-  }
+  },
+
+  /**
+   * Download a message attachment
+   * @param {Number} attachmentId - The ID of the attachment
+   * @returns {Promise} Promise with download URL
+   */
+  downloadAttachment: async (attachmentId) => {
+    try {
+      const response = await api.get(`/message-attachments/${attachmentId}/download`, {
+        responseType: 'blob'
+      });
+      
+      // Create a download URL
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      return {
+        success: true,
+        url
+      };
+    } catch (error) {
+      console.error(`Error downloading attachment ${attachmentId}:`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Could not download attachment',
+        error: error.response?.data || error.message
+      };
+    }
+  },
 };
 
 export default chatService;

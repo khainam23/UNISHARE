@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Image, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import { Card, Button, Image, Row, Col, Alert, Spinner, Badge } from 'react-bootstrap';
 import userAvatar from '../../assets/avatar-1.png';
 import UnishareMessageDetail from './UnishareMessageDetail';
 import { chatService } from '../../services';
@@ -11,6 +11,8 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState(null);
   const [messageCache, setMessageCache] = useState({});
+  const [filesForUpload, setFilesForUpload] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
   
   // Filter chats based on tab
   const filteredChats = activeTab === 'group' 
@@ -30,6 +32,11 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
       fetchMessages(selectedChat.id);
     }
   }, [selectedChat]);
+
+  // Fetch unread counts when component mounts or chats change
+  useEffect(() => {
+    fetchUnreadCounts();
+  }, []);
 
   const fetchMessages = async (chatId) => {
     // Check if we already have cached messages for this chat
@@ -82,23 +89,80 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
     }
   };
 
+  // Fetch unread message counts
+  const fetchUnreadCounts = async () => {
+    try {
+      const response = await chatService.getUnreadCounts();
+      if (response && response.data) {
+        const counts = {};
+        
+        // Format the response into a simple object with chatId as key and count as value
+        response.data.forEach(item => {
+          counts[item.chat_id] = item.unread_count;
+        });
+        
+        setUnreadCounts(counts);
+      }
+    } catch (err) {
+      console.error('Error fetching unread counts:', err);
+    }
+  };
+
   const handleSelectChat = (chat) => {
     setSelectedChat(chat);
+    
+    // Mark chat as read when selected
+    if (chat && unreadCounts[chat.id] > 0) {
+      markChatAsRead(chat.id);
+    }
   };
 
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setSelectedChat(null); // Reset selected chat when changing tabs
+  const markChatAsRead = async (chatId) => {
+    try {
+      await chatService.markChatAsRead(chatId);
+      
+      // Update local unread counts immediately for a responsive UI
+      setUnreadCounts(prev => ({
+        ...prev,
+        [chatId]: 0
+      }));
+    } catch (err) {
+      console.error('Error marking chat as read:', err);
+    }
   };
 
-  const sendMessage = async (content) => {
-    if (!selectedChat || !content.trim()) return;
+  const handleMessagesRead = (chatId) => {
+    // Update unread count when messages are marked as read
+    setUnreadCounts(prev => ({
+      ...prev,
+      [chatId]: 0
+    }));
+  };
+
+  const sendMessage = async (content, files = []) => {
+    if (!selectedChat || (!content.trim() && !files.length)) return;
     
     try {
       console.log(`Attempting to send message to chat ${selectedChat.id}:`, content);
+      console.log(`With ${files.length} attachments`);
       setError(null);
       
-      const response = await chatService.sendMessage(selectedChat.id, { content });
+      let response;
+      
+      // Ensure content is always a string, never null or undefined
+      const messageContent = content || '';
+      
+      // If we have files to upload
+      if (files && files.length > 0) {
+        response = await chatService.sendMessageWithAttachments(
+          selectedChat.id, 
+          { content: messageContent }, 
+          files
+        );
+      } else {
+        // Normal text message
+        response = await chatService.sendMessage(selectedChat.id, { content: messageContent });
+      }
       
       console.log('Send message response:', response);
       
@@ -128,9 +192,16 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
         console.error('Failed to send message:', response.message);
         setError(response.message || 'Không thể gửi tin nhắn. Vui lòng thử lại sau.');
       }
+      
+      return response;
     } catch (err) {
       console.error('Error sending message:', err);
       setError('Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại sau.');
+      
+      return {
+        success: false,
+        message: err.message || 'Đã xảy ra lỗi khi gửi tin nhắn'
+      };
     }
   };
 
@@ -146,6 +217,11 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSelectedChat(null); // Reset selected chat when changing tabs
   };
 
   return (
@@ -221,10 +297,23 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
                       />
                       <div className="flex-grow-1">
                         <div className="d-flex justify-content-between align-items-center mb-1">
-                          <span className="fw-bold" style={{ color: '#0370b7', fontSize: '1rem' }}>
-                            {chat.name || (chat.participants && chat.participants.length > 0 ? 
-                              chat.participants.map(p => p.user?.name).join(', ') : 'Cuộc trò chuyện')}
-                          </span>
+                          <div className="d-flex align-items-center">
+                            <span className="fw-bold" style={{ color: '#0370b7', fontSize: '1rem' }}>
+                              {chat.name || (chat.participants && chat.participants.length > 0 ? 
+                                chat.participants.map(p => p.user?.name).join(', ') : 'Cuộc trò chuyện')}
+                            </span>
+                            {/* Add unread message badge */}
+                            {unreadCounts[chat.id] > 0 && (
+                              <Badge 
+                                bg="danger" 
+                                pill 
+                                className="ms-2"
+                                style={{ fontSize: '0.7rem' }}
+                              >
+                                {unreadCounts[chat.id]}
+                              </Badge>
+                            )}
+                          </div>
                           <span className="text-muted small">{formatChatTime(chat.updated_at)}</span>
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.9rem' }}>
@@ -252,6 +341,7 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
                 messages={messages}
                 loading={loadingMessages}
                 onSendMessage={sendMessage}
+                onMessagesRead={handleMessagesRead}
               />
             </Col>
           )}
