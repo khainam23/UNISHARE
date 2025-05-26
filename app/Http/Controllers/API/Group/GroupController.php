@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\GroupResource;
 use App\Models\Group;
 use App\Models\Chat;
+use App\Models\FileUpload;
 use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -103,7 +104,7 @@ class GroupController extends Controller
         }
         
         // Check if user has permission to create groups
-        if (!$request->user()->can('create group')) {
+        if (!$request->user()->can('create groups')) {
             return response()->json(['message' => 'You do not have permission to create groups'], 403);
         }
         
@@ -183,7 +184,7 @@ class GroupController extends Controller
         // Check if user has permission to update this group
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to update this group'], 403);
         }
         
@@ -232,7 +233,7 @@ class GroupController extends Controller
         // Check if user has permission to delete this group
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to delete this group'], 403);
         }
         
@@ -285,7 +286,10 @@ class GroupController extends Controller
         $isMember = $group->members()->where('user_id', $request->user()->id)->exists();
         
         if ($isMember) {
-            return response()->json(['message' => 'You are already a member of this group'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'You are already a member of this group'
+            ], 400);
         }
         
         // Check if the group is private
@@ -308,7 +312,10 @@ class GroupController extends Controller
                 );
             }
             
-            return response()->json(['message' => 'Join request sent successfully']);
+            return response()->json([
+                'success' => true,
+                'message' => 'Join request sent successfully'
+            ]);
         } else {
             // Add user as a member using attach instead of create
             $group->members()->attach($request->user()->id, [
@@ -323,7 +330,10 @@ class GroupController extends Controller
             // Automatically add user to group chat if it exists
             $this->addMemberToGroupChat($group->id, $request->user()->id);
             
-            return response()->json(['message' => 'Joined group successfully']);
+            return response()->json([
+                'success' => true,
+                'message' => 'Joined group successfully'
+            ]);
         }
     }
     
@@ -450,7 +460,7 @@ class GroupController extends Controller
         // Check if user has permission to update members
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to update members'], 403);
         }
         
@@ -488,7 +498,7 @@ class GroupController extends Controller
         // Check if user has permission to remove members
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to remove members'], 403);
         }
         
@@ -521,13 +531,44 @@ class GroupController extends Controller
         
         return response()->json(['message' => 'Member removed successfully']);
     }
+
+    public function checkJoinRequestStatus(Request $request, Group $group)
+    {
+        $user = $request->user();
+        
+        // Check if user is already a member
+        $isMember = $group->members()->where('user_id', $user->id)->exists();
+        
+        if ($isMember) {
+            return response()->json([
+                'success' => true,
+                'data' => ['status' => 'member']
+            ]);
+        }
+        
+        // Check if user has a pending join request
+        $joinRequest = $group->joinRequests()->where('user_id', $user->id)->first();
+        
+        if ($joinRequest) {
+            return response()->json([
+                'success' => true,
+                'data' => ['status' => $joinRequest->status]
+            ]);
+        }
+        
+        // User has no join request and is not a member
+        return response()->json([
+            'success' => true,
+            'data' => ['status' => 'none']
+        ]);
+    }
     
     public function joinRequests(Request $request, Group $group)
     {
         // Check if user has permission to view join requests
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to view join requests'], 403);
         }
         
@@ -541,7 +582,7 @@ class GroupController extends Controller
         // Check if user has permission to approve join requests
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to approve join requests'], 403);
         }
         
@@ -580,7 +621,7 @@ class GroupController extends Controller
         // Check if user has permission to reject join requests
         $isAdmin = $group->members()->where('user_id', $request->user()->id)->where('role', 'admin')->exists();
         
-        if (!$isAdmin && !$request->user()->can('manage any group')) {
+        if (!$isAdmin && !$request->user()->can('manage group members')) {
             return response()->json(['message' => 'You do not have permission to reject join requests'], 403);
         }
         
