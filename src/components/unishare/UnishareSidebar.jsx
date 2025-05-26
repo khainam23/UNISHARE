@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Nav, Image, Button, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import userAvatar from '../../assets/avatar-1.png';
-import { FaHome, FaUsers, FaComments, FaHistory, FaCog, FaFileContract, FaPlus } from 'react-icons/fa';
+import { FaHome, FaUsers, FaComments, FaHistory, FaCog, FaFileContract, FaPlus, FaClock } from 'react-icons/fa';
 import { authService, groupService } from '../../services';
 
 // Thời gian cache (1 giờ)
@@ -142,9 +142,7 @@ const UnshareSidebar = ({ activeSection = 'home', hasNewMessages = false }) => {
           >
             <FaHome className="me-2" />
             Trang chủ
-          </Nav.Link>
-          
-          <Nav.Link
+          </Nav.Link>          <Nav.Link
             as={Link}
             to="/unishare/my-groups"
             active={activeSection === 'my-groups'}
@@ -153,6 +151,28 @@ const UnshareSidebar = ({ activeSection = 'home', hasNewMessages = false }) => {
           >
             <FaUsers className="me-2" />
             Nhóm của tôi
+          </Nav.Link>
+          
+          <Nav.Link
+            as={Link}
+            to="/unishare"
+            active={activeSection === 'popular-groups'}
+            className={`d-flex align-items-center py-2 px-3 fw-bold ${activeSection !== 'popular-groups' ? 'text-primary sidebar-link' : ''}`}
+            style={{ borderRadius: '0.5rem' }}
+          >
+            <FaUsers className="me-2" />
+            Nhóm phổ biến
+          </Nav.Link>
+             
+          <Nav.Link
+            as={Link}
+            to="/unishare/new-groups"
+            active={activeSection === 'new-groups'}
+            className={`d-flex align-items-center py-2 px-3 fw-bold ${activeSection !== 'new-groups' ? 'text-primary sidebar-link' : ''}`}
+            style={{ borderRadius: '0.5rem' }}
+          >
+            <FaClock className="me-2" />
+            Nhóm học mới nhất
           </Nav.Link>
           
           <Nav.Link

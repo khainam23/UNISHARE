@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Form, Button, Spinner, Alert, InputGroup } from 'react-bootstrap';
-import { FaSearch, FaFilter } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaClock } from 'react-icons/fa';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import UnshareSidebar from '../components/unishare/UnishareSidebar';
 import UnishareCourseSection from '../components/unishare/UnishareCourseSection';
 import { groupService } from '../services';
 
-const PopularGroupsPage = () => {
+const NewStudyGroupsPage = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     type: '',
-    sort_by: 'member_count',
+    sort_by: 'created_at',
     sort_direction: 'desc'
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -78,7 +78,7 @@ const PopularGroupsPage = () => {
   const resetFilters = () => {
     setFilters({
       type: '',
-      sort_by: 'member_count',
+      sort_by: 'created_at',
       sort_direction: 'desc'
     });
     setSearchQuery('');
@@ -90,15 +90,19 @@ const PopularGroupsPage = () => {
       <div className="py-4" style={{ backgroundColor: '#e9f5ff', minHeight: 'calc(100vh - 120px)' }}>
         <Container>
           <Row>
-            {/* Sidebar */}            <Col md={3}>
-              <UnshareSidebar activeSection="popular-groups" />
+            {/* Sidebar */}
+            <Col md={3}>
+              <UnshareSidebar activeSection="new-groups" />
             </Col>
             
             {/* Main Content */}
             <Col md={9}>
               <div className="bg-white rounded shadow p-4 mb-4" style={{ border: '2px solid #b3d8f6', borderRadius: '1rem' }}>
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h4 className="fw-bold mb-0" style={{ color: '#0370b7' }}>Nhóm Học Phổ Biến</h4>
+                  <h4 className="fw-bold mb-0 d-flex align-items-center" style={{ color: '#0370b7' }}>
+                    <FaClock className="me-2" />
+                    Nhóm Học Mới Nhất
+                  </h4>
                   <Button 
                     variant="outline-primary" 
                     className="d-flex align-items-center"
@@ -108,11 +112,19 @@ const PopularGroupsPage = () => {
                   </Button>
                 </div>
                 
+                {/* Description */}
+                <div className="alert alert-info mb-4">
+                  <small>
+                    <FaClock className="me-2" />
+                    Khám phá các nhóm học mới được tạo gần đây. Tham gia ngay để kết nối với các thành viên mới và cùng nhau học tập!
+                  </small>
+                </div>
+                
                 {/* Search Bar */}
                 <Form onSubmit={handleSearch} className="mb-4">
                   <InputGroup>
                     <Form.Control
-                      placeholder="Tìm kiếm nhóm học..."
+                      placeholder="Tìm kiếm nhóm học mới..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -150,8 +162,8 @@ const PopularGroupsPage = () => {
                             value={filters.sort_by}
                             onChange={handleFilterChange}
                           >
-                            <option value="member_count">Số thành viên</option>
                             <option value="created_at">Ngày tạo</option>
+                            <option value="member_count">Số thành viên</option>
                             <option value="name">Tên nhóm</option>
                           </Form.Select>
                         </Form.Group>
@@ -164,8 +176,8 @@ const PopularGroupsPage = () => {
                             value={filters.sort_direction}
                             onChange={handleFilterChange}
                           >
-                            <option value="desc">Giảm dần</option>
-                            <option value="asc">Tăng dần</option>
+                            <option value="desc">Mới nhất trước</option>
+                            <option value="asc">Cũ nhất trước</option>
                           </Form.Select>
                         </Form.Group>
                       </Col>
@@ -201,7 +213,7 @@ const PopularGroupsPage = () => {
                 {loading ? (
                   <div className="text-center py-5">
                     <Spinner animation="border" variant="primary" />
-                    <p className="mt-2">Đang tải danh sách nhóm...</p>
+                    <p className="mt-2">Đang tải danh sách nhóm mới...</p>
                   </div>
                 ) : groups.length > 0 ? (
                   <UnishareCourseSection 
@@ -209,7 +221,7 @@ const PopularGroupsPage = () => {
                   />
                 ) : (
                   <Alert variant="info">
-                    Không tìm thấy nhóm học nào phù hợp với tiêu chí tìm kiếm.
+                    Không tìm thấy nhóm học mới nào phù hợp với tiêu chí tìm kiếm.
                   </Alert>
                 )}
               </div>
@@ -222,4 +234,4 @@ const PopularGroupsPage = () => {
   );
 };
 
-export default PopularGroupsPage;
+export default NewStudyGroupsPage;

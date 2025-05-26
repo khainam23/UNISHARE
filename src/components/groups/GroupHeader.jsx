@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button, Badge, Spinner, Alert, Dropdown } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BsPeopleFill, BsChatDots, BsCalendar3, BsBook, BsDoorOpen, BsExclamationTriangle, BsThreeDotsVertical } from 'react-icons/bs';
 import defaultAvatar from '../../assets/avatar-1.png';
-import { profileService, groupService, reportService } from '../../services';
+import { profileService, groupService, reportService, chatService } from '../../services';
 import LeaveGroupModal from './LeaveGroupModal';
 import ReportModal from '../common/ReportModal';
 
@@ -12,10 +12,29 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [joiningGroup, setJoiningGroup] = useState(false);
-  const [leavingGroup, setLeavingGroup] = useState(false);
-  const [joinError, setJoinError] = useState('');
+  const [leavingGroup, setLeavingGroup] = useState(false);  const [joinError, setJoinError] = useState('');
   const [joinRequestPending, setJoinRequestPending] = useState(false);
   const [isGroupReported, setIsGroupReported] = useState(false); // New state for report status
+  const [creatingGroupChat, setCreatingGroupChat] = useState(false);
+  const navigate = useNavigate();
+
+  // Handle group chat creation and navigation
+  const handleGroupChat = async () => {
+    try {
+      setCreatingGroupChat(true);
+      const response = await chatService.getGroupChat(group.id);
+      
+      if (response.success) {
+        navigate(`/unishare/chats/${response.data.id}`);
+      } else {
+        console.error('Failed to get group chat:', response.message);
+      }
+    } catch (error) {
+      console.error('Error creating/getting group chat:', error);
+    } finally {
+      setCreatingGroupChat(false);
+    }
+  };
   
   // Use a fallback cover style instead of requiring an image file
   const defaultCoverStyle = {
@@ -243,17 +262,25 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
                       Tham gia nhóm
                     </Button>
                   )
-                ) : (
-                  <div className="d-flex flex-column w-100 gap-2">
+                ) : (                  <div className="d-flex flex-column w-100 gap-2">
                     <Button 
-                      as={Link}
-                      to={`/unishare/groups/${group.id}/chat`}
                       variant="primary"
+                      onClick={handleGroupChat}
+                      disabled={creatingGroupChat}
                       className="d-inline-flex align-items-center justify-content-center chat-btn py-2"
                       size="lg"
                     >
-                      <BsChatDots className="me-2" />
-                      Trò chuyện nhóm
+                      {creatingGroupChat ? (
+                        <>
+                          <Spinner animation="border" size="sm" className="me-2" />
+                          Đang tạo...
+                        </>
+                      ) : (
+                        <>
+                          <BsChatDots className="me-2" />
+                          Trò chuyện nhóm
+                        </>
+                      )}
                     </Button>
                     
                     {isAdmin ? (

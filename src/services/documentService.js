@@ -4,25 +4,130 @@ import cacheService from './cacheService';
 /**
  * Service for document-related operations
  */
-const documentService = {
+const documentService = {  /**
+   * Get popular documents
+   * @param {Object} params - Additional query parameters
+   * @returns {Promise} Promise with popular documents
+   */
+  getPopularDocuments: async (params = {}) => {
+    try {
+      // Create parameters with sorting by download count
+      const queryParams = {
+        ...params,
+        page: params.page || 1,
+        per_page: params.per_page || 12
+      };
+      
+      const cacheKey = `popular_docs_${JSON.stringify(queryParams)}`;
+      const cachedData = cacheService.get(cacheKey);
+      
+      if (cachedData) {
+        return cachedData;
+      }
+      
+      const response = await apiRequestWithRetry('get', '/home/popular-documents', null, { params: queryParams });
+      
+      const result = {
+        success: true,
+        data: response.data.data || response.data,
+        meta: response.data.meta || {}
+      };
+      
+      // Cache popular documents for 5 minutes
+      cacheService.set(cacheKey, result, 5 * 60 * 1000);
+      
+      return result;
+    } catch (error) {
+      console.error('Error fetching popular documents:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch popular documents',
+        data: []
+      };
+    }
+  },
+  
   /**
+   * Get new documents
+   * @param {Object} params - Additional query parameters
+   * @returns {Promise} Promise with new documents
+   */
+  getNewDocuments: async (params = {}) => {
+    try {
+      // Create parameters with sorting by created_at date
+      const queryParams = {
+        ...params,
+        sortBy: 'latest', // Ensure sorting by latest
+        page: params.page || 1,
+        per_page: params.per_page || 12
+      };
+      
+      const cacheKey = `new_docs_${JSON.stringify(queryParams)}`;
+      const cachedData = cacheService.get(cacheKey);
+      
+      if (cachedData) {
+        return cachedData;
+      }
+      
+      const response = await apiRequestWithRetry('get', '/home/new-documents', null, { params: queryParams });
+      
+      const result = {
+        success: true,
+        data: response.data.data || response.data,
+        meta: response.data.meta || {}
+      };
+      
+      // Cache new documents for 2 minutes (shorter than popular as they change more frequently)
+      cacheService.set(cacheKey, result, 2 * 60 * 1000);
+      
+      return result;
+    } catch (error) {
+      console.error('Error fetching new documents:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch new documents',
+        data: []
+      };
+    }
+  },
+    /**
    * Get all documents with optional filters
    * @param {Object} params - Query parameters
    * @returns {Promise} Promise with documents
    */
   getAllDocuments: async (params = {}) => {
     try {
-      const response = await apiRequestWithRetry('get', '/documents', null, { params });
-      return {
+      // Create parameters for query
+      const queryParams = {
+        ...params,
+        page: params.page || 1,
+        per_page: params.per_page || 12
+      };
+      
+      const cacheKey = `all_docs_${JSON.stringify(queryParams)}`;
+      const cachedData = cacheService.get(cacheKey);
+      
+      if (cachedData) {
+        return cachedData;
+      }
+      
+      const response = await apiRequestWithRetry('get', '/home/all-documents', null, { params: queryParams });
+      
+      const result = {
         success: true,
         data: response.data.data || response.data,
         meta: response.data.meta || {}
       };
+      
+      // Cache all documents for 2 minutes
+      cacheService.set(cacheKey, result, 2 * 60 * 1000);
+      
+      return result;
     } catch (error) {
-      console.error('Error fetching documents:', error);
+      console.error('Error fetching all documents:', error);
       return {
         success: false,
-        message: error.response?.data?.message || error.message,
+        message: error.response?.data?.message || error.message || 'Failed to fetch documents',
         data: []
       };
     }

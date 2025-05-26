@@ -195,15 +195,22 @@ const chatService = {
    * @param {Number} chatId - The ID of the chat
    * @param {Object} messageData - The message data
    * @returns {Promise} Promise with sent message data
-   */
-  sendMessage: async (chatId, messageData) => {
+   */  sendMessage: async (chatId, messageData) => {
     try {
       console.log(`Sending message to chat ${chatId}:`, messageData);
       
-      // Ensure content is sent properly
+      // Ensure content is sent properly and never null/undefined
       const payload = {
-        content: messageData.content
+        content: (messageData.content || '').trim()
       };
+      
+      // Validate that we have content to send
+      if (!payload.content) {
+        return {
+          success: false,
+          message: 'Message content is required'
+        };
+      }
       
       const response = await apiRequestWithRetry('post', `/chats/${chatId}/messages`, payload);
       

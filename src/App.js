@@ -17,6 +17,10 @@ import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import PopularGroupsPage from './pages/PopularGroupsPage';
+import NewStudyGroupsPage from './pages/NewStudyGroupsPage';
+import PopularDocumentsPage from './pages/PopularDocumentsPage';
+import AllDocumentsPage from './pages/AllDocumentsPage';
+import NewDocumentsPage from './pages/NewDocumentsPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
@@ -152,13 +156,15 @@ function App() {
           } />
           
           {/* Document sharing routes */}
-          <Route path="/unishare-files" element={<UniShareUpload activeSection="home" />} />
+          <Route path="/unishare-files" element={<AllDocumentsPage />} />
           <Route path="/unishare-files/home" element={<UniShareUpload activeSection="home" />} />
+          <Route path="/unishare-files/popular" element={<PopularDocumentsPage />} />
+          <Route path="/unishare-files/new" element={<NewDocumentsPage />} />
           <Route path="/unishare-files/upload" element={
             <ProtectedRoute>
               <UniShareUpload activeSection="upload" />
             </ProtectedRoute>
-          } />
+          }/>
           <Route path="/unishare-files/my-files" element={
             <ProtectedRoute>
               <UniShareUpload activeSection="my-files" />
@@ -204,10 +210,11 @@ function App() {
             <ProtectedRoute>
               <ChatPage />
             </ProtectedRoute>
-          } />
+          } />          {/* Popular Groups Page */}
+          <Route path="/unishare/popular-groups" element={<PopularGroupsPage />} />
           
-          {/* Redirect popular-groups to main page */}
-          <Route path="/unishare/popular-groups" element={<Navigate to="/unishare" replace />} />
+          {/* New Study Groups Page */}
+          <Route path="/unishare/new-groups" element={<NewStudyGroupsPage />} />
           
           {/* Terms of service page */}
           <Route path="/unishare/terms" element={<TermsOfServicePage />} />

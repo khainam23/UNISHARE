@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Card, ListGroup, Image, Button, Badge, Spinner, Alert, Pagination } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { profileService } from '../../services';
+import { Link, useNavigate } from 'react-router-dom';
+import { profileService, chatService, authService } from '../../services';
 import defaultAvatar from '../../assets/avatar-1.png';
 
-const GroupMembers = ({ groupId, isAdmin }) => {
-  const [members, setMembers] = useState([]);
+const GroupMembers = ({ groupId, isAdmin }) => {  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [creatingChat, setCreatingChat] = useState({});
+  const [creatingGroupChat, setCreatingGroupChat] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchMembers(currentPage);
@@ -103,7 +105,6 @@ const GroupMembers = ({ groupId, isAdmin }) => {
       </Pagination>
     );
   };
-
   const getRoleBadge = (role) => {
     switch (role) {
       case 'admin':
@@ -112,6 +113,69 @@ const GroupMembers = ({ groupId, isAdmin }) => {
         return <Badge bg="warning">Điều hành viên</Badge>;
       default:
         return <Badge bg="secondary">Thành viên</Badge>;
+    }
+  };
+  const handleStartChat = async (member) => {
+    // Don't allow chat with self
+    const currentUser = authService.getUser();
+    if (currentUser && currentUser.id === member.id) {
+      return;
+    }
+
+    try {
+      setCreatingChat(prev => ({ ...prev, [member.id]: true }));
+      
+      // Create or find existing direct chat
+      const response = await chatService.createChat({
+        user_id: member.id
+      });
+      
+      if (response && response.data) {
+        // Navigate to the chat
+        const chatId = response.data.id;
+        navigate(`/unishare/chats/${chatId}`);
+      } else {
+        throw new Error('Không thể tạo cuộc trò chuyện');
+      }
+    } catch (err) {
+      console.error('Error creating/finding chat:', err);
+      setError('Không thể tạo cuộc trò chuyện. Vui lòng thử lại sau.');
+    } finally {
+      setCreatingChat(prev => ({ ...prev, [member.id]: false }));
+    }
+  };
+
+  const handleCreateGroupChat = async () => {
+    try {
+      setCreatingGroupChat(true);
+      
+      // Get group information first
+      const response = await profileService.getGroup(groupId);
+      if (!response.success) {
+        throw new Error('Không thể lấy thông tin nhóm');
+      }
+      
+      const group = response.data;
+      
+      // Create group chat
+      const chatResponse = await chatService.createGroupChat({
+        name: `Chat nhóm: ${group.name}`,
+        description: `Cuộc trò chuyện cho nhóm ${group.name}`,
+        group_id: groupId
+      });
+      
+      if (chatResponse && chatResponse.data) {
+        // Navigate to the group chat
+        const chatId = chatResponse.data.id;
+        navigate(`/unishare/chats/${chatId}`);
+      } else {
+        throw new Error('Không thể tạo cuộc trò chuyện nhóm');
+      }
+    } catch (err) {
+      console.error('Error creating group chat:', err);
+      setError('Không thể tạo cuộc trò chuyện nhóm. Vui lòng thử lại sau.');
+    } finally {
+      setCreatingGroupChat(false);
     }
   };
 
@@ -151,8 +215,7 @@ const GroupMembers = ({ groupId, isAdmin }) => {
             <ListGroup.Item className="text-center py-4">
               <p className="text-muted mb-0">Không tìm thấy thành viên nào</p>
             </ListGroup.Item>
-          ) : (
-            members.map((member) => (
+          ) : (            members.map((member) => (
               <ListGroup.Item key={member.id} className="d-flex justify-content-between align-items-center p-3">
                 <div className="d-flex align-items-center">
                   <Image 
@@ -175,16 +238,33 @@ const GroupMembers = ({ groupId, isAdmin }) => {
                     </div>
                   </div>
                 </div>
-                <div>
+                <div className="d-flex gap-2">
                   <Button 
                     as={Link}
                     to={`/profile/${member.id}`}
-                    variant="link" 
+                    variant="outline-primary" 
                     size="sm"
                     className="text-decoration-none"
                   >
                     Xem hồ sơ
                   </Button>
+                  {authService.getUser()?.id !== member.id && (
+                    <Button 
+                      variant="outline-success" 
+                      size="sm"
+                      onClick={() => handleStartChat(member)}
+                      disabled={creatingChat[member.id]}
+                    >
+                      {creatingChat[member.id] ? (
+                        <>
+                          <Spinner animation="border" size="sm" className="me-1" />
+                          Đang tạo...
+                        </>
+                      ) : (
+                        'Nhắn tin'
+                      )}
+                    </Button>
+                  )}
                 </div>
               </ListGroup.Item>
             ))

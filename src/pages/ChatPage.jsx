@@ -376,7 +376,6 @@ const ChatPage = () => {
     newAttachments.splice(index, 1);
     setAttachments(newAttachments);
   };
-
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
@@ -387,15 +386,23 @@ const ChatPage = () => {
     try {
       setSending(true);
       
-      const formData = new FormData();
-      formData.append('content', newMessage);
+      let response;
       
-      // Add attachments to form data
-      attachments.forEach((attachment, index) => {
-        formData.append(`attachments[${index}]`, attachment.file);
-      });
-      
-      const response = await chatService.sendMessage(chatId, formData);
+      if (attachments.length > 0) {
+        // Send message with attachments using FormData
+        const formData = new FormData();
+        formData.append('content', newMessage.trim());
+        
+        // Add attachments to form data
+        attachments.forEach((attachment, index) => {
+          formData.append(`attachments[${index}]`, attachment.file);
+        });
+        
+        response = await chatService.sendMessageWithAttachments(chatId, { content: newMessage.trim() }, attachments.map(a => a.file));
+      } else {
+        // Send regular text message
+        response = await chatService.sendMessage(chatId, { content: newMessage.trim() });
+      }
       
       if (response.success || response.data) {
         // Add new message to the list

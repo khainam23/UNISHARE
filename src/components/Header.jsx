@@ -222,21 +222,17 @@ const Header = () => {
               <NavDropdown.Item as={Link} to="/unishare?type=free">Khóa học miễn phí</NavDropdown.Item>
               <NavDropdown.Divider />
               <NavDropdown.Item as={Link} to="/unishare">Tất cả khóa học</NavDropdown.Item>
-            </NavDropdown>
-            
-            <NavDropdown title="Nhóm học" id="groups-dropdown">
-              <NavDropdown.Item as={Link} to="/unishare/groups?type=popular">Nhóm học phổ biến</NavDropdown.Item>
-              <NavDropdown.Item as={Link} to="/unishare/groups?type=new">Nhóm học mới</NavDropdown.Item>
+            </NavDropdown>            <NavDropdown title="Nhóm học" id="groups-dropdown">
+              <NavDropdown.Item as={Link} to="/unishare/popular-groups">Nhóm học phổ biến</NavDropdown.Item>
+              <NavDropdown.Item as={Link} to="/unishare/new-groups">Nhóm học mới nhất</NavDropdown.Item>
               {isLoggedIn && (
                 <NavDropdown.Item as={Link} to="/unishare/my-groups">Nhóm của tôi</NavDropdown.Item>
               )}
               <NavDropdown.Divider />
-              <NavDropdown.Item as={Link} to="/unishare/groups">Tất cả nhóm học</NavDropdown.Item>
-            </NavDropdown>
-            
-            <NavDropdown title="Tài liệu" id="documents-dropdown">
-              <NavDropdown.Item as={Link} to="/unishare-files?type=popular">Tài liệu phổ biến</NavDropdown.Item>
-              <NavDropdown.Item as={Link} to="/unishare-files?type=new">Tài liệu mới</NavDropdown.Item>
+              <NavDropdown.Item as={Link} to="/unishare">Tất cả nhóm học</NavDropdown.Item>
+            </NavDropdown><NavDropdown title="Tài liệu" id="documents-dropdown">
+              <NavDropdown.Item as={Link} to="/unishare-files/popular">Tài liệu phổ biến</NavDropdown.Item>
+              <NavDropdown.Item as={Link} to="/unishare-files/new">Tài liệu mới</NavDropdown.Item>
               {isLoggedIn && (
                 <NavDropdown.Item as={Link} to="/unishare-files/my-files">Tài liệu của tôi</NavDropdown.Item>
               )}
