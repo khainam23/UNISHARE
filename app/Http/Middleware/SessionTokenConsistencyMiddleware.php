@@ -34,10 +34,11 @@ class SessionTokenConsistencyMiddleware
             }
             
             // Check if user has tokens
-            $hasValidToken = $user->tokens()->exists();
+            $hasValidToken = $user->tokens()->exists() || $request->is('api/broadcasting/auth');
             
             // If no valid token but authenticated session exists, clean up the session
-            if (!$hasValidToken && !$request->is('api/auth/login', 'api/auth/logout')) {
+            // Skip this check for broadcasting auth requests which might use session auth
+            if (!$hasValidToken && !$request->is('api/auth/login', 'api/auth/logout', 'api/broadcasting/auth')) {
                 Log::warning('User has session but no valid token - logging out', [
                     'user_id' => $user->id,
                     'session_id' => session()->getId()

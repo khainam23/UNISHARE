@@ -189,13 +189,17 @@ class AuthController extends Controller
             'email' => $user ? $user->email : null
         ]);
         
-        // Revoke all tokens for this user instead of just the current one
+        // Only revoke the current token rather than all tokens for the user
         if ($user) {
-            // Delete all tokens for this user
-            $user->tokens()->delete();
-            
-            // Delete all sessions from database for this user
-            \DB::table('sessions')->where('user_id', $user->id)->delete();
+            // Delete only the current token
+            if ($request->bearerToken()) {
+                $user->tokens()->where('token', hash('sha256', $request->bearerToken()))->delete();
+            } else {
+                // If using web session without token, only delete the current session
+                if (session()->getId()) {
+                    \DB::table('sessions')->where('id', session()->getId())->delete();
+                }
+            }
             
             // If using user_authentications table, update logout time
             if (Schema::hasTable('user_authentications')) {
@@ -207,10 +211,11 @@ class AuthController extends Controller
             }
             
             // Log sessions cleanup for debugging
-            Log::info('Sessions cleanup for user', [
+            Log::info('Session logout for user', [
                 'user_id' => $user->id,
-                'tokens_deleted' => true,
-                'sessions_deleted' => true
+                'session_id' => session()->getId(),
+                'token' => $request->bearerToken() ? 'Present (specific token revoked)' : 'None',
+                'current_session_deleted' => true
             ]);
         }
         

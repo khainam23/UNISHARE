@@ -177,6 +177,9 @@ class MessageController extends Controller
         // Load the message with user and attachments
         $message->load('user', 'attachments');
         
+        // Broadcast the message to chat participants
+        broadcast(new MessageSent($message))->toOthers();
+        
         // Process any emoji in the content
         if (!empty($message->content)) {
             // Using a simple emoji processing for display
