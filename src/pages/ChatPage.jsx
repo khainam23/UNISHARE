@@ -20,6 +20,7 @@ const ChatPage = () => {
   const [attachments, setAttachments] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [authError, setAuthError] = useState(false);
   const messagesEndRef = useRef(null);
   const isComponentMounted = useRef(true); // Track if component is mounted
   const pollIntervalRef = useRef(null); // Reference to the polling interval
@@ -33,14 +34,19 @@ const ChatPage = () => {
     console.log('ChatPage mounted');
     isComponentMounted.current = true;
     
-    // Setup real-time event listeners
+    // Check authentication before setting up real-time
+    const token = authService.getToken();
+    if (!token) {
+      setAuthError(true);
+      return;
+    }
+
+    // Setup real-time event listeners only once per component mount
     const handleNewMessage = (newMessage, chat) => {
       console.log('Real-time: New message received in ChatPage', newMessage);
       
-      // Only update if the message is for the current chat
       if (newMessage.chat_id == chatId && isComponentMounted.current) {
         setMessages(prevMessages => {
-          // Check if message already exists to avoid duplicates
           const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
           if (messageExists) {
             return prevMessages;
@@ -48,7 +54,6 @@ const ChatPage = () => {
           return [...prevMessages, newMessage];
         });
         
-        // Auto-scroll to bottom if user was near bottom
         if (isNearBottom.current) {
           setTimeout(() => {
             scrollToBottom('smooth');
@@ -64,26 +69,36 @@ const ChatPage = () => {
       }
     };
 
-    // Subscribe to real-time events
-    const isRealTimeSetup = chatService.subscribeToRealTimeEvents(
-      handleNewMessage,
-      handleChatUpdated,
-      null // Don't need chat list updates in ChatPage
-    );
+    // Subscribe to real-time events with safety check
+    // Only set up once per component mount to avoid duplicate connections
+    let isRealTimeSetup = false;
+    if (chatService && typeof chatService.subscribeToRealTimeEvents === 'function') {
+      try {
+        isRealTimeSetup = chatService.subscribeToRealTimeEvents(
+          handleNewMessage,
+          handleChatUpdated,
+          null // Don't need chat list updates in ChatPage
+        );
+        
+        if (isRealTimeSetup) {
+          console.log('Real-time events set up successfully in ChatPage');
+        }
+      } catch (error) {
+        console.error('Error setting up real-time events in ChatPage:', error);
+        isRealTimeSetup = false;
+      }
+    }
 
     if (!isRealTimeSetup) {
-      console.log('Real-time setup failed, falling back to polling');
-      // Keep the polling as fallback
+      console.log('Real-time setup failed in ChatPage, chat will work without real-time updates');
     }
     
     return () => {
       console.log('ChatPage unmounted');
       isComponentMounted.current = false;
       
-      // Clean up real-time listeners
-      chatService.unsubscribeFromAllEvents();
-      
-      // Clear any intervals when component unmounts
+      // Don't clean up chatService here since other components might be using it
+      // Only clean up component-specific resources
       if (pollIntervalRef.current) {
         console.log('Clearing poll interval on unmount');
         clearInterval(pollIntervalRef.current);
@@ -229,26 +244,37 @@ const ChatPage = () => {
               setMessages(messagesData);
               
               // Subscribe to real-time messages for this specific chat
-              chatService.subscribeToChat(chatId, (newMessage) => {
-                console.log('Real-time: New message in current chat', newMessage);
-                if (isComponentMounted.current && chatId === currentChatIdRef.current) {
-                  setMessages(prevMessages => {
-                    // Check if message already exists to avoid duplicates
-                    const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
-                    if (messageExists) {
-                      return prevMessages;
+              try {
+                if (chatService && typeof chatService.subscribeToChat === 'function') {
+                  chatService.subscribeToChat(chatId, (newMessage) => {
+                    console.log('Real-time: New message in current chat', newMessage);
+                    if (isComponentMounted.current && chatId === currentChatIdRef.current) {
+                      setMessages(prevMessages => {
+                        // Check if message already exists to avoid duplicates
+                        const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
+                        if (messageExists) {
+                          console.log('Message already exists, skipping duplicate');
+                          return prevMessages;
+                        }
+                        console.log('Adding new message to chat');
+                        return [...prevMessages, newMessage];
+                      });
+                      
+                      // Auto-scroll to bottom if user was near bottom
+                      if (isNearBottom.current) {
+                        setTimeout(() => {
+                          scrollToBottom('smooth');
+                        }, 100);
+                      }
                     }
-                    return [...prevMessages, newMessage];
                   });
-                  
-                  // Auto-scroll to bottom if user was near bottom
-                  if (isNearBottom.current) {
-                    setTimeout(() => {
-                      scrollToBottom('smooth');
-                    }, 100);
-                  }
+                } else {
+                  console.warn('subscribeToChat method not available on chatService');
                 }
-              });
+              } catch (subscriptionError) {
+                console.warn('Error setting up real-time subscription for chat:', subscriptionError);
+                // Continue without real-time updates
+              }
               
               // Mark chat as read         
            try {
@@ -288,7 +314,13 @@ const ChatPage = () => {
     // Cleanup previous chat subscription when switching chats
     return () => {
       if (currentChatIdRef.current) {
-        chatService.unsubscribeFromChat(currentChatIdRef.current);
+        try {
+          if (chatService && typeof chatService.unsubscribeFromChat === 'function') {
+            chatService.unsubscribeFromChat(currentChatIdRef.current);
+          }
+        } catch (error) {
+          console.error('Error unsubscribing from chat:', error);
+        }
       }
     };  }, [chatId]);
   // Removed 'error' from dependencies to prevent re-running effect when error changes
@@ -344,8 +376,7 @@ const ChatPage = () => {
     // This effect runs after render when chatBodyRef is available
     const setupScrollListener = () => {
       if (!chatBodyRef.current) {
-        console.log('chatBodyRef still not available, trying again in 100ms');
-        setTimeout(setupScrollListener, 100);
+        console.log('chatBodyRef still not available, skipping scroll listener setup');
         return;
       }
       
@@ -370,16 +401,18 @@ const ChatPage = () => {
       return cleanup;
     };
     
-    // Initial setup
-    const cleanup = setupScrollListener();
-    
-    // Cleanup function
-    return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, []);
+    // Only setup scroll listener if we have chat content
+    if (chat && !loading) {
+      const cleanup = setupScrollListener();
+      
+      // Cleanup function
+      return () => {
+        if (typeof cleanup === 'function') {
+          cleanup();
+        }
+      };
+    }
+  }, [chat, loading]); // Add chat and loading as dependencies
   
   // Scroll to bottom only in specific cases:
   // 1. Initial load (loading becomes false)
@@ -515,6 +548,20 @@ const ChatPage = () => {
       <Header />
       <div className="chat-page py-4" style={{ backgroundColor: '#f5f8fa', minHeight: 'calc(100vh - 120px)' }}>
         <Container fluid>
+          {authError && (
+            <Row className="mb-3">
+              <Col>
+                <Alert variant="danger">
+                  <Alert.Heading>Yêu cầu đăng nhập</Alert.Heading>
+                  <p>Bạn cần đăng nhập để sử dụng tính năng chat.</p>
+                  <Button variant="outline-danger" onClick={() => navigate('/login')}>
+                    Đăng nhập
+                  </Button>
+                </Alert>
+              </Col>
+            </Row>
+          )}
+          
           <Row>
             {/* Chat Sidebar */}
             <Col md={3} className="mb-3">
@@ -595,7 +642,7 @@ const ChatPage = () => {
                           <h5>Chưa có tin nhắn nào</h5>
                           <p>Hãy bắt đầu cuộc trò chuyện bằng cách gửi tin nhắn đầu tiên!</p>
                         </div>
-                      ) : (
+                      ) :  
                         // Sắp xếp tin nhắn từ cũ đến mới dựa trên thời gian tạo
                         [...messages]
                           .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
@@ -606,7 +653,8 @@ const ChatPage = () => {
                               isOwnMessage={currentUser && message.user_id === currentUser.id}
                             />
                           ))
-                      )}
+                      }
+                      
                       <div ref={messagesEndRef} />
                     </Card.Body>
                     

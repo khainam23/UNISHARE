@@ -1,4 +1,4 @@
-import api, { getCsrfToken } from './api';
+import api, { getCsrfToken, API_BASE_URL } from './api';
 import passwordService from './passwordService';
 
 // Cache mechanism for user data
@@ -12,9 +12,9 @@ let userDataCache = {
 // Cache expiration time (5 minutes)
 const CACHE_EXPIRATION = 5 * 60 * 1000;
 
-const authService = {
+class AuthService {
   // Register a new user
-  register: async (userData) => {
+  async register(userData) {
     try {
       // Get CSRF token before making the request
       await getCsrfToken();
@@ -32,10 +32,10 @@ const authService = {
     } catch (error) {
       throw error.response ? error.response.data : error;
     }
-  },
+  }
 
   // Login user
-  login: async (credentials) => {
+  async login(credentials) {
     try {
       // Get CSRF token before making the request
       await getCsrfToken();
@@ -102,10 +102,10 @@ const authService = {
       
       throw error.response?.data || { message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.' };
     }
-  },
+  }
 
   // Logout user
-  logout: async () => {
+  async logout() {
     try {
       // Get CSRF token before making the request
       await getCsrfToken();
@@ -135,10 +135,10 @@ const authService = {
         pendingPromise: null
       };
     }
-  },
+  }
   
   // Get current user info with additional activity data
-  getCurrentUser: async (forceRefresh = false) => {
+  async getCurrentUser(forceRefresh = false) {
     // If we already have a request in progress, return that promise
     if (userDataCache.loading && userDataCache.pendingPromise) {
       console.log('getCurrentUser: Returning pending promise for in-progress request');
@@ -248,15 +248,15 @@ const authService = {
       userDataCache.pendingPromise = null;
       throw error;
     }
-  },
+  }
 
   // Check if user is logged in
-  isLoggedIn: () => {
+  isLoggedIn() {
     return !!localStorage.getItem('token');
-  },
+  }
 
   // Get user from local storage or cache
-  getUser: () => {
+  getUser() {
     // First check cache
     if (userDataCache.data) {
       return userDataCache.data;
@@ -278,35 +278,35 @@ const authService = {
     }
     
     return null;
-  },
+  }
 
   // Refresh the user's role information
-  refreshUserInfo: async () => {
-    if (!authService.isLoggedIn()) {
+  async refreshUserInfo() {
+    if (!this.isLoggedIn()) {
       return null;
     }
     
     try {
       // Force refresh from API
-      const userData = await authService.getCurrentUser(true);
+      const userData = await this.getCurrentUser(true);
       return userData;
     } catch (error) {
       console.error('Failed to refresh user info:', error);
       return null;
     }
-  },
+  }
 
   // Forgot password request
-  forgotPassword: async (email) => {
+  async forgotPassword(email) {
     return passwordService.forgotPassword(email);
-  },
+  }
   
-  resetPassword: async (data) => {
+  async resetPassword(data) {
     return passwordService.resetPassword(data);
-  },
+  }
   
   // Invalidate cache (useful after profile updates)
-  invalidateCache: () => {
+  invalidateCache() {
     userDataCache = {
       data: null,
       timestamp: 0,
@@ -314,6 +314,50 @@ const authService = {
       pendingPromise: null
     };
   }
-};
+
+  // Refresh token
+  async refreshToken() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Token refresh failed');
+      }
+
+      // Update stored tokens
+      localStorage.setItem('access_token', data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem('refresh_token', data.refresh_token);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      // Clear invalid tokens
+      this.logout();
+      throw error;
+    }
+  }
+
+  // Add method to get token for other services
+  getToken() {
+    return localStorage.getItem('token');
+  }
+}
+
+const authService = new AuthService();
 
 export default authService;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Image, Row, Col, Alert, Spinner, Badge } from 'react-bootstrap';
 import userAvatar from '../../assets/avatar-1.png';
 import UnishareMessageDetail from './UnishareMessageDetail';
-import { chatService } from '../../services';
+import { chatService, authService } from '../../services';
 
 const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
   const [activeTab, setActiveTab] = useState('group');
@@ -13,6 +13,7 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
   const [messageCache, setMessageCache] = useState({});
   const [filesForUpload, setFilesForUpload] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [authError, setAuthError] = useState(false);
   
   // Filter chats based on tab
   const filteredChats = activeTab === 'group' 
@@ -36,7 +37,58 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
   // Fetch unread counts when component mounts or chats change
   useEffect(() => {
     fetchUnreadCounts();
-  }, []);
+    
+    // Set up real-time message listener for this component
+    const handleNewMessage = (newMessage, chat) => {
+      console.log('Real-time: New message received in UnishareMessages', newMessage);
+      
+      // Update the selected chat's messages if it matches
+      if (selectedChat && newMessage.chat_id === selectedChat.id) {
+        setMessages(prev => {
+          // Check for duplicates
+          const messageExists = prev.some(msg => msg.id === newMessage.id);
+          if (messageExists) return prev;
+          
+          // Add new message
+          return [...prev, newMessage].sort((a, b) => 
+            new Date(a.created_at) - new Date(b.created_at)
+          );
+        });
+        
+        // Update cache
+        setMessageCache(prev => ({
+          ...prev,
+          [selectedChat.id]: [...(prev[selectedChat.id] || []), newMessage]
+        }));
+      }
+      
+      // Update unread counts
+      if (newMessage.user_id !== authService.getUser()?.id) {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [newMessage.chat_id]: (prev[newMessage.chat_id] || 0) + 1
+        }));
+      }
+    };
+
+    // Subscribe to real-time events
+    if (chatService && typeof chatService.subscribeToRealTimeEvents === 'function') {
+      try {
+        chatService.subscribeToRealTimeEvents(
+          handleNewMessage,
+          null, // Don't need chat updates
+          null  // Don't need chat list updates here
+        );
+      } catch (error) {
+        console.error('Error setting up real-time events in UnishareMessages:', error);
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      console.log('UnishareMessages component unmounted');
+    };
+  }, [selectedChat]);
 
   const fetchMessages = async (chatId) => {
     // Check if we already have cached messages for this chat
@@ -102,9 +154,13 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
         });
         
         setUnreadCounts(counts);
+        setAuthError(false); // Clear auth error on success
       }
     } catch (err) {
       console.error('Error fetching unread counts:', err);
+      if (err.message?.includes('Authentication required')) {
+        setAuthError(true);
+      }
     }
   };
 
@@ -152,25 +208,30 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
       // Ensure content is always a string, never null or undefined
       const messageContent = content || '';
       
+      console.log('Final message content being sent:', messageContent);
+      
       // If we have files to upload
       if (files && files.length > 0) {
+        console.log('Sending message with attachments');
         response = await chatService.sendMessageWithAttachments(
           selectedChat.id, 
           { content: messageContent }, 
           files
         );
       } else {
+        console.log('Sending regular text message');
         // Normal text message
         response = await chatService.sendMessage(selectedChat.id, { content: messageContent });
       }
       
-      console.log('Send message response:', response);
+      console.log('Send message response received:', response);
       
-      if (response.success) {
+      if (response && (response.success === true || response.success !== false)) {
         console.log('Message sent successfully');
         
         // Add new message to the cache immediately
         if (response.data) {
+          console.log('Adding new message to local state:', response.data);
           const newMessage = response.data;
           
           // Update message cache for this chat
@@ -185,22 +246,34 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
           // Update current messages
           setMessages(prev => [...prev, newMessage]);
         } else {
+          console.log('No message data in response, reloading messages');
           // Reload messages to show the new message if we don't have message data
           fetchMessages(selectedChat.id);
         }
+        
+        return {
+          success: true,
+          data: response.data,
+          message: 'Message sent successfully'
+        };
       } else {
-        console.error('Failed to send message:', response.message);
-        setError(response.message || 'Không thể gửi tin nhắn. Vui lòng thử lại sau.');
+        console.error('Failed to send message:', response);
+        const errorMessage = (response && response.message) || 'Không thể gửi tin nhắn. Vui lòng thử lại sau.';
+        setError(errorMessage);
+        
+        return {
+          success: false,
+          message: errorMessage
+        };
       }
-      
-      return response;
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại sau.');
+      const errorMessage = 'Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại sau.';
+      setError(errorMessage);
       
       return {
         success: false,
-        message: err.message || 'Đã xảy ra lỗi khi gửi tin nhắn'
+        message: err.message || errorMessage
       };
     }
   };
@@ -228,6 +301,18 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
     <div className="mb-4">
       <h5 className="fw-bold mb-3" style={{ color: '#0370b7' }}>Tin Nhắn</h5>
       
+      {authError && (
+        <Alert variant="warning" className="mb-3">
+          <div className="d-flex align-items-center">
+            <strong>Phiên đăng nhập đã hết hạn</strong>
+          </div>
+          <p className="mb-2">Vui lòng đăng nhập lại để sử dụng tính năng chat.</p>
+          <Button variant="outline-warning" size="sm" onClick={() => window.location.reload()}>
+            Tải lại trang
+          </Button>
+        </Alert>
+      )}
+
       {/* Tabs */}
       <div className="mb-3 d-flex">
         <Button
@@ -275,7 +360,7 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
                   <div className="text-center p-4">
                     <p className="text-muted mb-0">Không có cuộc trò chuyện nào.</p>
                   </div>
-                ) : (
+                ) : 
                   filteredChats.map((chat) => (
                     <div
                       key={chat.id}
@@ -322,7 +407,7 @@ const UnishareMessages = ({ chats = [], loading = false, onChatCreated }) => {
                       </div>
                     </div>
                   ))
-                )}
+                }
               </Card.Body>
             </Card>
           </Col>

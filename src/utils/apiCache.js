@@ -4,11 +4,103 @@ import cacheService from '../services/cacheService';
  * Simple cache utility for API responses
  */
 
-// Cache storage
-const apiCache = new Map();
-
-// Default TTL in milliseconds (5 minutes)
-const DEFAULT_TTL = 5 * 60 * 1000;
+const apiCache = {
+  // Cache storage
+  cache: new Map(),
+  
+  // Default cache duration (5 minutes)
+  defaultTTL: 5 * 60 * 1000,
+  
+  // Set cache entry
+  set(key, data, ttl = this.defaultTTL) {
+    const expiresAt = Date.now() + ttl;
+    this.cache.set(key, {
+      data,
+      expiresAt,
+      createdAt: Date.now()
+    });
+  },
+  
+  // Get cache entry
+  get(key) {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return null;
+    }
+    
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  },
+  
+  // Check if key exists and is not expired
+  has(key) {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return false;
+    }
+    
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return false;
+    }
+    
+    return true;
+  },
+  
+  // Delete cache entry
+  delete(key) {
+    return this.cache.delete(key);
+  },
+  
+  // Clear all cache
+  clear() {
+    this.cache.clear();
+  },
+  
+  // Get cache size
+  size() {
+    return this.cache.size;
+  },
+  
+  // Clean expired entries
+  cleanup() {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        this.cache.delete(key);
+      }
+    }
+  },
+  
+  // Get cache stats
+  getStats() {
+    const now = Date.now();
+    let expired = 0;
+    let valid = 0;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        expired++;
+      } else {
+        valid++;
+      }
+    }
+    
+    return {
+      total: this.cache.size,
+      valid,
+      expired
+    };
+  }
+};
 
 /**
  * Get data from cache or fetch it and store in cache
@@ -21,7 +113,7 @@ const DEFAULT_TTL = 5 * 60 * 1000;
  * @returns {Promise<any>} - Cached data or freshly fetched data
  */
 export const getCachedData = async (key, fetchFn, options = {}) => {
-  const { ttl = DEFAULT_TTL, refreshIfExpired = true } = options;
+  const { ttl = apiCache.defaultTTL, refreshIfExpired = true } = options;
   const now = Date.now();
   
   // Check if we have a valid cache entry
@@ -151,12 +243,4 @@ export const isRequestCancelled = (error) => {
   return error && error.name === 'AbortError';
 };
 
-export default {
-  getCachedData,
-  invalidateCache,
-  clearCache,
-  createCacheKey,
-  cachedApiRequest,
-  createCancellableRequest,
-  isRequestCancelled
-};
+export default apiCache;

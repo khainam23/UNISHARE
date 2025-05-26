@@ -68,3 +68,37 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+# UniShare Frontend
+
+## Environment Setup
+
+### Required Environment Variables
+
+Copy `.env.example` to `.env` and configure the following variables:
+
+```env
+REACT_APP_API_URL=http://localhost:8000
+REACT_APP_PUSHER_KEY=your_pusher_app_key
+REACT_APP_PUSHER_CLUSTER=your_pusher_cluster
+```
+
+### Pusher Setup (Optional)
+
+Real-time chat features require Pusher configuration:
+
+1. Create a free account at [Pusher.com](https://pusher.com/)
+2. Create a new app in your Pusher dashboard
+3. Copy the App Key and Cluster from your Pusher app settings
+4. Add them to your `.env` file
+
+**Note:** If Pusher is not configured, the app will fall back to polling mode. Chat will still work but real-time updates will have a delay.
+
+## Installation and Running
+
+```bash
+npm install
+npm start
+```
+
+The app will run on `http://localhost:3000`

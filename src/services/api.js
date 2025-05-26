@@ -1,15 +1,17 @@
 import axios from 'axios';
 
-// Create the base API instance with common configuration
+// Set the base URL for API requests
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+// Create axios instance with default config
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/',
+  baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest', // Important for Laravel to recognize AJAX requests
   },
-  withCredentials: true, // Enable passing cookies for CORS requests
-  timeout: 10000, // 10 second timeout
+  withCredentials: true
 });
 
 // Store the baseURL for reference in other functions
@@ -67,76 +69,56 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle common errors
+// Response interceptor
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Log the error for debugging
-    console.error('API Error:', error);
-    
-    // Add specific error handling based on status codes
-    if (error.response) {
-      // Server returned an error response
-      console.error('Error status:', error.response.status);
-      console.error('Error data:', error.response.data);
-      
-      if (error.response.status === 401) {
-        // Unauthorized - Only redirect if it's not a login/register request
-        if (!error.config.url.includes('/auth/login') && !error.config.url.includes('/auth/register')) {
-          console.warn('Unauthorized access, redirecting to login');
-          
-          // Clear user data
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          
-          // Only redirect in production
-          if (process.env.NODE_ENV === 'production') {
-            window.location.href = '/login';
-          }
-        } else {
-          console.warn('Login/register request failed with 401');
-        }
-      }
-      
-      if (error.response.status === 403) {
-        // Forbidden - user doesn't have permission
-        console.warn('Access forbidden: Insufficient permissions or wrong role');
-        
-        // Handle role-based errors specifically
-        if (error.response.data && 
-            (error.response.data.message?.includes('quyền') || 
-             error.response.data.message?.includes('Unauthorized'))) {
-          console.error('Role/permission error:', error.response.data.message);
-          
-          // Add more detailed debugging for role errors
-          const userData = localStorage.getItem('user');
-          if (userData) {
-            try {
-              const user = JSON.parse(userData);
-              console.log('Current user roles:', user.roles);
-              console.log('Current endpoint:', error.config.url);
-            } catch (e) {}
-          }
-        }
-      }
-      
-      if (error.response.status === 422) {
-        // Validation error
-        console.warn('Validation error:', error.response.data.errors);
-      }
-      
-      if (error.response.status >= 500) {
-        // Server error
-        console.error('Server error:', error.response.status);
-      }
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-    } else {
-      // Something happened in setting up the request
-      console.error('Request setup error:', error.message);
+  (response) => {
+    // Log successful responses for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`API Response [${response.config.method?.toUpperCase()} ${response.config.url}]:`, {
+        status: response.status,
+        data: response.data,
+        headers: response.headers
+      });
     }
     
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Log error responses for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`API Error [${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}]:`, {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+    }
+
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // Try to refresh the token
+        const authService = require('./authService').default;
+        await authService.refreshToken();
+        
+        // Retry the original request
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        
+        // Clear stored auth data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+
     return Promise.reject(error);
   }
 );

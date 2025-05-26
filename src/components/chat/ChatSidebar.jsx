@@ -3,7 +3,7 @@ import { ListGroup, Image, Badge, Spinner, Alert, Form, InputGroup, OverlayTrigg
 import { Link } from 'react-router-dom';
 import { FaSearch, FaUsers, FaUser, FaCircle } from 'react-icons/fa';
 import userAvatar from '../../assets/avatar-1.png';
-import { chatService } from '../../services';
+import { chatService, authService } from '../../services';
 
 const ChatSidebar = ({ activeChatId }) => {
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ const ChatSidebar = ({ activeChatId }) => {
     console.log('ChatSidebar mounted');
     isComponentMounted.current = true;
     
-    // Setup real-time event listeners
+    // Setup real-time event listeners only if not already set up
     const handleChatListUpdated = () => {
       console.log('Real-time: Chat list updated, refreshing...');
       if (isComponentMounted.current) {
@@ -86,18 +86,19 @@ const ChatSidebar = ({ activeChatId }) => {
     };
 
     const handleNewMessage = (newMessage, chat) => {
-      console.log('Real-time: New message received in ChatSidebar', newMessage);
+      console.log('Real-time: New message received in ChatSidebar', newMessage, chat);
       // Update the specific chat in the list
       if (isComponentMounted.current) {
         setChats(prevChats => {
           return prevChats.map(c => {
-            if (c.id === chat.id) {
+            if (c.id === (chat?.id || newMessage?.chat_id)) {
               return {
                 ...c,
                 last_message: newMessage,
                 last_message_at: newMessage.created_at,
-                is_read: false, // Mark as unread since it's a new message
-                unread_count: (c.unread_count || 0) + 1
+                is_read: newMessage.user_id === authService.getUser()?.id, // Only mark as read if it's from current user
+                unread_count: newMessage.user_id === authService.getUser()?.id ? 
+                  c.unread_count : (c.unread_count || 0) + 1
               };
             }
             return c;
@@ -106,16 +107,36 @@ const ChatSidebar = ({ activeChatId }) => {
       }
     };
 
-    // Subscribe to real-time events
-    const isRealTimeSetup = chatService.subscribeToRealTimeEvents(
-      handleNewMessage,
-      null, // Don't need individual chat updates in sidebar
-      handleChatListUpdated
-    );
+    // Check if real-time is already connected before subscribing
+    let isRealTimeSetup = false;
+    if (chatService && typeof chatService.subscribeToRealTimeEvents === 'function') {
+      try {
+        // Check if already connected
+        if (chatService.pusher && chatService.pusher.connection.state === 'connected') {
+          console.log('Pusher already connected, updating callbacks for ChatSidebar');
+          // Update callbacks without reconnecting
+          chatService.realTimeCallbacks = {
+            ...chatService.realTimeCallbacks,
+            onNewMessage: handleNewMessage,
+            onChatListUpdated: handleChatListUpdated
+          };
+          isRealTimeSetup = true;
+        } else {
+          // Set up new connection
+          isRealTimeSetup = chatService.subscribeToRealTimeEvents(
+            handleNewMessage,
+            null, // Don't need individual chat updates in sidebar
+            handleChatListUpdated
+          );
+        }
+      } catch (error) {
+        console.error('Error setting up real-time events in ChatSidebar:', error);
+        isRealTimeSetup = false;
+      }
+    }
 
     if (!isRealTimeSetup) {
-      console.log('Real-time setup failed, falling back to polling');
-      // Keep polling as fallback
+      console.log('Real-time setup failed in ChatSidebar, falling back to polling');
       setupPolling();
     }
     
@@ -123,17 +144,16 @@ const ChatSidebar = ({ activeChatId }) => {
       console.log('ChatSidebar unmounted');
       isComponentMounted.current = false;
       
-      // Clean up real-time listeners
-      chatService.unsubscribeFromAllEvents();
-      
       // Clear any intervals when component unmounts
       if (pollIntervalRef.current) {
         console.log('Clearing poll interval on unmount');
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
+      
+      // Don't clean up the global chatService connection here since other components might be using it
     };
-  }, []);
+  }, []); // Empty dependency array to run only once on mount
 
   const setupPolling = () => {
     // Poll for new chats/messages every 60 seconds as fallback

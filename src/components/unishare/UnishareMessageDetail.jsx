@@ -168,16 +168,28 @@ const UnishareMessageDetail = ({ chat, messages = [], loading = false, onSendMes
       // This helps avoid database constraint violations
       const messageContent = messageInput || '';
       
+      console.log('Calling onSendMessage with content:', messageContent);
+      
       // Call parent's onSendMessage with both content and files
       const response = await onSendMessage(messageContent, selectedFiles);
       
-      if (response && response.success) {
+      console.log('Response from onSendMessage:', response);
+      
+      if (response && (response.success === true || response.success !== false)) {
+        console.log('Message sent successfully, clearing form');
         // Clear the input and files after successful send
         setMessageInput('');
         setSelectedFiles([]);
         setPreviewUrls([]);
+        
+        // Force scroll to bottom after sending
+        setTimeout(() => {
+          scrollToBottom('smooth');
+        }, 100);
       } else {
-        setUploadError((response && response.message) || 'Failed to send message. Please try again.');
+        console.error('Message send failed:', response);
+        const errorMessage = (response && response.message) || 'Failed to send message. Please try again.';
+        setUploadError(errorMessage);
       }
     } catch (error) {
       console.error('Error sending message:', error);
