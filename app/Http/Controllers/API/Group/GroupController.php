@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Group;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\GroupResource;
 use App\Models\Group;
+use App\Models\Chat;
 use App\Services\FileUploadService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -319,6 +320,9 @@ class GroupController extends Controller
             // Update member count
             $group->increment('member_count');
             
+            // Automatically add user to group chat if it exists
+            $this->addMemberToGroupChat($group->id, $request->user()->id);
+            
             return response()->json(['message' => 'Joined group successfully']);
         }
     }
@@ -557,6 +561,9 @@ class GroupController extends Controller
             'role' => 'member',
         ]);
         
+        // Automatically add user to group chat if it exists
+        $this->addMemberToGroupChat($group->id, $userId);
+        
         // Notify the user
         $this->notificationService->sendNotification(
             $userId,
@@ -596,5 +603,42 @@ class GroupController extends Controller
         );
         
         return response()->json(['message' => 'Join request rejected successfully']);
+    }
+    
+    /**
+     * Automatically add a member to the group chat when they join the group
+     * 
+     * @param int $groupId
+     * @param int $userId
+     * @return void
+     */
+    private function addMemberToGroupChat($groupId, $userId)
+    {
+        try {
+            // Find the group chat if it exists
+            $chat = \App\Models\Chat::where('group_id', $groupId)->first();
+            
+            if ($chat) {
+                // Check if user is already a participant
+                $isParticipant = $chat->participants()->where('user_id', $userId)->exists();
+                
+                if (!$isParticipant) {
+                    // Add user to the chat
+                    $chat->participants()->create([
+                        'user_id' => $userId,
+                        'is_admin' => false,
+                        'joined_at' => now()
+                    ]);
+                    
+                    \Log::info("Added user {$userId} to group chat for group {$groupId}");
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error("Failed to add user to group chat", [
+                'group_id' => $groupId,
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 }

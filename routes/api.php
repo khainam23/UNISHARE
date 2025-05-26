@@ -57,6 +57,9 @@ Route::get('/health-check', function () {
 // Home routes - public access
 Route::prefix('home')->group(function () {
     Route::get('/popular-courses', [HomeController::class, 'getPopularCourses']);
+    Route::get('/popular-documents', [HomeController::class, 'getPopularDocuments']);
+    Route::get('/new-documents', [HomeController::class, 'getNewDocuments']);
+    Route::get('/all-documents', [HomeController::class, 'getAllDocuments']);
     Route::get('/free-documents', [HomeController::class, 'getFreeDocuments']);
     Route::get('/recent-posts', [HomeController::class, 'getRecentPosts']);
     Route::get('/stats', [HomeController::class, 'getStats']);

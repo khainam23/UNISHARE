@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Message;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ChatResource;
 use App\Models\Chat;
+use App\Models\Group;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -58,7 +59,7 @@ class ChatController extends Controller
         // Create a new chat
         $chat = Chat::create([
             'name' => null, // For direct chats, name can be null
-            'type' => 'direct',
+            'type' => 'private',
             'created_by' => $currentUserId,
             'is_group' => false,
             'last_message_at' => now(),
@@ -75,9 +76,35 @@ class ChatController extends Controller
     {
         $userId = request()->user()->id;
         
-        // Check if user is part of this chat
-        if (!$chat->hasActiveParticipant($userId)) {
-            return response()->json(['message' => 'You do not have permission to view this chat'], 403);
+        // For group chats, check if user is a group member and auto-add as participant if needed
+        if ($chat->type === 'group' && $chat->group_id) {
+            $group = $chat->group;
+            
+            if ($group) {
+                $isMember = $group->members()->where('user_id', $userId)->where('status', 'approved')->exists();
+                $isAdmin = request()->user()->hasRole('admin') || request()->user()->hasRole('moderator');
+                
+                if (!$isMember && !$isAdmin) {
+                    return response()->json(['message' => 'You are not a member of this group'], 403);
+                }
+                
+                // Check if user is a participant, if not add them
+                $isParticipant = $chat->participants()->where('user_id', $userId)->exists();
+                
+                if (!$isParticipant && ($isMember || $isAdmin)) {
+                    // Add user as participant since they are a group member
+                    $chat->participants()->create([
+                        'user_id' => $userId,
+                        'is_admin' => false,
+                        'joined_at' => now()
+                    ]);
+                }
+            }
+        } else {
+            // For non-group chats, use the original permission check
+            if (!$chat->hasActiveParticipant($userId)) {
+                return response()->json(['message' => 'You do not have permission to view this chat'], 403);
+            }
         }
         
         return new ChatResource($chat->load(['participants.user', 'lastMessage']));

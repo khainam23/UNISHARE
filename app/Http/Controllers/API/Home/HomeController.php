@@ -43,8 +43,7 @@ class HomeController extends Controller
                         'id' => $course->id,
                         'title' => $course->name,
                         'description' => $course->description ?? substr($course->name, 0, 100),
-                        'thumbnail' => $course->cover_image ? url('storage/' . $course->cover_image) : url('storage/courses/course' . ($course->id % 4 + 1) . '.jpg'),
-                        'member_count' => $course->member_count ?? 0,
+                        'thumbnail' => $course->cover_image ? url('storage/' . $course->cover_image) : url('storage/courses/course' . ($course->id % 4 + 1) . '.jpg'),                        'member_count' => $course->member_count ?? 0,
                         'course_code' => $course->course_code,
                     ];
                 }),
@@ -139,9 +138,7 @@ class HomeController extends Controller
                 'data' => $this->getDummyDocuments(),
             ]);
         }
-    }
-
-    /**
+    }    /**
      * Get recent blog posts for the homepage
      */
     public function getRecentPosts(Request $request)
@@ -268,6 +265,355 @@ class HomeController extends Controller
     }
 
     /**
+     * Get popular documents
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPopularDocuments(Request $request)
+    {
+        try {
+            $limit = $request->input('per_page', 12);
+            $page = $request->input('page', 1);
+            $offset = ($page - 1) * $limit;
+            
+            // Filter by subject if provided
+            $query = Document::query();
+            
+            if ($request->has('subject') && !empty($request->subject)) {
+                $query->where('subject', $request->subject);
+            }
+            
+            // Add search filter if provided
+            if ($request->has('search') && !empty($request->search)) {
+                $searchTerm = $request->search;
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('title', 'like', "%{$searchTerm}%")
+                      ->orWhere('description', 'like', "%{$searchTerm}%")
+                      ->orWhere('course_code', 'like', "%{$searchTerm}%");
+                });
+            }
+            
+            // Only show approved documents to regular users
+            $query->where(function($q) {
+                $q->where('status', 'approved')
+                  ->orWhere('is_approved', true);
+            });
+            
+            // Order by download count for popular documents
+            $query->orderBy('download_count', 'desc');
+            
+            // Get total count before pagination
+            $total = $query->count();
+            
+            // Apply pagination
+            $documents = $query->skip($offset)->take($limit)->get();
+            
+            // If no documents found, return dummy data
+            if ($documents->isEmpty() && $page == 1) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $this->getDummyDocuments(),
+                    'meta' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => $limit,
+                        'total' => count($this->getDummyDocuments())
+                    ]
+                ]);
+            }
+            
+            // Map documents to resources
+            $documentData = $documents->map(function ($document) {
+                return [
+                    'id' => $document->id,
+                    'title' => $document->title ?? 'Untitled Document',
+                    'description' => $document->description ?? 'No description available',
+                    'thumbnail' => $document->thumbnail_url,
+                    'downloads' => $document->download_count ?? 0,
+                    'file_type' => $document->file_type ?? 'unknown',
+                    'course_code' => $document->course_code,
+                    'subject' => $document->subject,
+                    'view_count' => $document->view_count ?? 0,
+                    'download_count' => $document->download_count ?? 0,
+                    'average_rating' => $document->getAverageRatingAttribute() ?? 0,
+                    'is_official' => $document->is_official ?? false,
+                    'created_at' => $document->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $document->updated_at->format('Y-m-d H:i:s'),
+                    'download_url' => url('/api/documents/'.$document->id.'/download'),
+                    'view_url' => url('/api/documents/'.$document->id.'/view'),
+                    'author' => $document->user ? $document->user->name : 'Unknown Author',
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'data' => $documentData,
+                'meta' => [
+                    'current_page' => (int)$page,
+                    'last_page' => ceil($total / $limit),
+                    'per_page' => (int)$limit,
+                    'total' => $total
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getPopularDocuments: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => true,
+                'data' => $this->getDummyDocuments(),
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 12,
+                    'total' => count($this->getDummyDocuments())
+                ]
+            ]);
+        }
+    }
+
+    /**
+     * Get new documents
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getNewDocuments(Request $request)
+    {
+        try {
+            $limit = $request->input('per_page', 12);
+            $page = $request->input('page', 1);
+            $offset = ($page - 1) * $limit;
+            
+            // Filter by subject if provided
+            $query = Document::query();
+            
+            if ($request->has('subject') && !empty($request->subject)) {
+                $query->where('subject', $request->subject);
+            }
+            
+            // Add search filter if provided
+            if ($request->has('search') && !empty($request->search)) {
+                $searchTerm = $request->search;
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('title', 'like', "%{$searchTerm}%")
+                      ->orWhere('description', 'like', "%{$searchTerm}%")
+                      ->orWhere('course_code', 'like', "%{$searchTerm}%");
+                });
+            }
+            
+            // Only show approved documents to regular users
+            $query->where(function($q) {
+                $q->where('status', 'approved')
+                  ->orWhere('is_approved', true);
+            });
+            
+            // Order by created_at date for new documents
+            $query->orderBy('created_at', 'desc');
+            
+            // Get total count before pagination
+            $total = $query->count();
+            
+            // Apply pagination
+            $documents = $query->skip($offset)->take($limit)->get();
+            
+            // If no documents found, return dummy data
+            if ($documents->isEmpty() && $page == 1) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $this->getDummyDocuments(),
+                    'meta' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => $limit,
+                        'total' => count($this->getDummyDocuments())
+                    ]
+                ]);
+            }
+            
+            // Map documents to resources
+            $documentData = $documents->map(function ($document) {
+                return [
+                    'id' => $document->id,
+                    'title' => $document->title ?? 'Untitled Document',
+                    'description' => $document->description ?? 'No description available',
+                    'thumbnail' => $document->thumbnail_url,
+                    'downloads' => $document->download_count ?? 0,
+                    'file_type' => $document->file_type ?? 'unknown',
+                    'course_code' => $document->course_code,
+                    'subject' => $document->subject,
+                    'view_count' => $document->view_count ?? 0,
+                    'download_count' => $document->download_count ?? 0,
+                    'average_rating' => $document->getAverageRatingAttribute() ?? 0,
+                    'is_official' => $document->is_official ?? false,
+                    'created_at' => $document->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $document->updated_at->format('Y-m-d H:i:s'),
+                    'download_url' => url('/api/documents/'.$document->id.'/download'),
+                    'view_url' => url('/api/documents/'.$document->id.'/view'),
+                    'author' => $document->user ? $document->user->name : 'Unknown Author',
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'data' => $documentData,
+                'meta' => [
+                    'current_page' => (int)$page,
+                    'last_page' => ceil($total / $limit),
+                    'per_page' => (int)$limit,
+                    'total' => $total
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getNewDocuments: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => true,
+                'data' => $this->getDummyDocuments(),
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 12,
+                    'total' => count($this->getDummyDocuments())
+                ]
+            ]);
+        }
+    }
+
+    /**
+     * Get all documents
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getAllDocuments(Request $request)
+    {
+        try {
+            $limit = $request->input('per_page', 12);
+            $page = $request->input('page', 1);
+            $offset = ($page - 1) * $limit;
+            
+            // Filter by subject if provided
+            $query = Document::query();
+            
+            if ($request->has('subject') && !empty($request->subject)) {
+                $query->where('subject', $request->subject);
+            }
+            
+            // Add search filter if provided
+            if ($request->has('search') && !empty($request->search)) {
+                $searchTerm = $request->search;
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('title', 'like', "%{$searchTerm}%")
+                      ->orWhere('description', 'like', "%{$searchTerm}%")
+                      ->orWhere('course_code', 'like', "%{$searchTerm}%");
+                });
+            }
+            
+            // Only show approved documents to regular users
+            $query->where(function($q) {
+                $q->where('status', 'approved')
+                  ->orWhere('is_approved', true);
+            });
+            
+            // Sort documents based on sort parameter
+            if ($request->has('sortBy')) {
+                $sortField = $request->sortBy;
+                $sortDirection = $request->input('sortDirection', 'desc');
+                
+                switch ($sortField) {
+                    case 'latest':
+                        $query->orderBy('created_at', $sortDirection);
+                        break;
+                    case 'downloads':
+                        $query->orderBy('download_count', $sortDirection);
+                        break;
+                    case 'views':
+                        $query->orderBy('view_count', $sortDirection);
+                        break;
+                    case 'title':
+                        $query->orderBy('title', $sortDirection);
+                        break;
+                    default:
+                        $query->orderBy('created_at', 'desc');
+                }
+            } else {
+                $query->orderBy('created_at', 'desc');
+            }
+            
+            // Get total count before pagination
+            $total = $query->count();
+            
+            // Apply pagination
+            $documents = $query->skip($offset)->take($limit)->get();
+            
+            // If no documents found, return dummy data
+            if ($documents->isEmpty() && $page == 1) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $this->getDummyDocuments(),
+                    'meta' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => $limit,
+                        'total' => count($this->getDummyDocuments())
+                    ]
+                ]);
+            }
+            
+            // Map documents to resources
+            $documentData = $documents->map(function ($document) {
+                return [
+                    'id' => $document->id,
+                    'title' => $document->title ?? 'Untitled Document',
+                    'description' => $document->description ?? 'No description available',
+                    'thumbnail' => $document->thumbnail_url,
+                    'downloads' => $document->download_count ?? 0,
+                    'file_type' => $document->file_type ?? 'unknown',
+                    'course_code' => $document->course_code,
+                    'subject' => $document->subject,
+                    'view_count' => $document->view_count ?? 0,
+                    'download_count' => $document->download_count ?? 0,
+                    'average_rating' => $document->getAverageRatingAttribute() ?? 0,
+                    'is_official' => $document->is_official ?? false,
+                    'created_at' => $document->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $document->updated_at->format('Y-m-d H:i:s'),
+                    'download_url' => url('/api/documents/'.$document->id.'/download'),
+                    'view_url' => url('/api/documents/'.$document->id.'/view'),
+                    'author' => $document->user ? $document->user->name : 'Unknown Author',
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'data' => $documentData,
+                'meta' => [
+                    'current_page' => (int)$page,
+                    'last_page' => ceil($total / $limit),
+                    'per_page' => (int)$limit,
+                    'total' => $total
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in getAllDocuments: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => true,
+                'data' => $this->getDummyDocuments(),
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 12,
+                    'total' => count($this->getDummyDocuments())
+                ]
+            ]);
+        }
+    }
+
+    /**
      * Generate dummy courses data
      */
     private function getDummyCourses()
@@ -303,8 +649,7 @@ class HomeController extends Controller
                 'id' => 3,
                 'title' => 'Machine Learning cơ bản',
                 'description' => 'Khóa học giới thiệu các thuật toán machine learning phổ biến và cách áp dụng vào các bài toán thực tế.',
-                'thumbnail' => url('storage/courses/course3.jpg'),
-                'price' => 200000,
+                'thumbnail' => url('storage/courses/course3.jpg'),                'price' => 200000,
                 'downloads' => 756,
                 'ratings' => 4.7,
             ],
@@ -391,16 +736,14 @@ class HomeController extends Controller
                 'downloads' => 3456,
             ],
             [
-                'id' => 102,
-                'title' => 'Bài giảng Mạng máy tính',
+                'id' => 102,                'title' => 'Bài giảng Mạng máy tính',
                 'description' => 'Tổng hợp slide bài giảng môn Mạng máy tính',
                 'thumbnail' => url('storage/documents/pdf.png'),
                 'downloads' => 2987,
             ],
             [
                 'id' => 103,
-                'title' => 'Đề cương ôn tập Toán rời rạc',
-                'description' => 'Tài liệu ôn thi cuối kỳ môn Toán rời rạc',
+                'title' => 'Đề cương ôn tập Toán rời rạc',                'description' => 'Tài liệu ôn thi cuối kỳ môn Toán rời rạc',
                 'thumbnail' => url('storage/documents/ppt.png'),
                 'downloads' => 2543,
             ],
@@ -492,8 +835,7 @@ class HomeController extends Controller
             ],
         ];
     }
-    
-    /**
+      /**
      * Ensure all required directories exist
      */
     private function ensureDirectoriesExist()
@@ -506,7 +848,7 @@ class HomeController extends Controller
         
         foreach ($directories as $dir) {
             if (!Storage::disk('public')->exists($dir)) {
-                Storage::disk('public')->makeDirectory($dir, 0775, true);
+                Storage::disk('public')->makeDirectory($dir);
             }
         }
     }
