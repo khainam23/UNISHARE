@@ -65,9 +65,8 @@ const UnshareSidebar = ({ activeSection = 'home', hasNewMessages = false }) => {
           hasPermission = true;
         }
       }
-      
-      // Kiểm tra quyền rõ ràng từ danh sách permissions
-      if (!hasPermission && userData.permissions && userData.permissions.includes('create group')) {
+        // Kiểm tra quyền rõ ràng từ danh sách permissions
+      if (!hasPermission && userData.permissions && userData.permissions.includes('create groups')) {
         hasPermission = true;
       }
       

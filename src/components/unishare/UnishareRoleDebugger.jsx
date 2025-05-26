@@ -174,9 +174,8 @@ const UnishareRoleDebugger = () => {
           )}
           
           <Alert variant="info">
-            <Alert.Heading>Hướng dẫn khắc phục</Alert.Heading>
-            <p>
-              Nếu bạn không thấy quyền "create group" trong danh sách quyền hoặc vai trò của bạn không phải là admin, 
+            <Alert.Heading>Hướng dẫn khắc phục</Alert.Heading>            <p>
+              Nếu bạn không thấy quyền "create groups" trong danh sách quyền hoặc vai trò của bạn không phải là admin, 
               moderator hoặc lecturer, bạn sẽ không thể tạo nhóm học mới. Hãy liên hệ với quản trị viên để được cấp quyền.
             </p>
           </Alert>

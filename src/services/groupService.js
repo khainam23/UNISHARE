@@ -222,8 +222,7 @@ const groupService = {
           if (isAdmin(user) || isModerator(user) || isLecturer(user)) {
             return true;
           }
-          
-          if (user.permissions && user.permissions.includes('create group')) {
+            if (user.permissions && user.permissions.includes('create groups')) {
             return true;
           }
         }
@@ -235,8 +234,7 @@ const groupService = {
           if (isAdmin(refreshedUser) || isModerator(refreshedUser) || isLecturer(refreshedUser)) {
             return true;
           }
-          
-          if (refreshedUser.permissions && refreshedUser.permissions.includes('create group')) {
+            if (refreshedUser.permissions && refreshedUser.permissions.includes('create groups')) {
             return true;
           }
         }
@@ -422,8 +420,7 @@ const groupService = {
       throw error.response ? error.response.data : error;
     }
   },
-  
-  /**
+    /**
    * Join a group
    * @param {Number} groupId - The ID of the group to join
    * @returns {Promise} Promise with success message
@@ -431,10 +428,17 @@ const groupService = {
   joinGroup: async (groupId) => {
     try {
       const response = await api.post(`/groups/${groupId}/join`);
-      return response.data;
+      return {
+        success: true,
+        ...response.data
+      };
     } catch (error) {
       console.error(`Error joining group ID ${groupId}:`, error);
-      throw error.response ? error.response.data : error;
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to join group',
+        ...error.response?.data
+      };
     }
   },
   

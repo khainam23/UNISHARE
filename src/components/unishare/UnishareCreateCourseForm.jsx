@@ -55,12 +55,11 @@ const UnishareCreateCourseForm = ({ onGroupCreated }) => {
             return;
           }
         }
-        
-        // Log user permissions if available
+          // Log user permissions if available
         if (userData?.permissions) {
           console.log('User permissions:', userData.permissions);
-          if (userData.permissions.includes('create group')) {
-            console.log('User has explicit "create group" permission');
+          if (userData.permissions.includes('create groups')) {
+            console.log('User has explicit "create groups" permission');
             setCanCreateGroups(true);
             setCheckingPermissions(false);
             return;

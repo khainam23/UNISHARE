@@ -68,9 +68,8 @@ const GroupHeader = ({ group, isMember, isAdmin, onJoinGroup, onRefresh }) => {
       setJoinError('');
       setJoiningGroup(true);
       
-      const response = await groupService.joinGroup(group.id);
-      
-      if (response.success) {
+      const response = await groupService.joinGroup(group.id);      if (response.success) {
+        console.log("Successfully joined group:", response.message);
         setShowJoinModal(false);
         
         // If the join was successful without pending

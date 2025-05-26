@@ -215,14 +215,8 @@ const Header = () => {
           <Nav className="me-auto">
             <Nav.Link as={Link} to="/">Trang chủ</Nav.Link>
             <Nav.Link as={Link} to="/unishare">UniShare</Nav.Link>
-            
-            <NavDropdown title="Khóa học" id="courses-dropdown">
-              <NavDropdown.Item as={Link} to="/unishare?type=popular">Khóa học phổ biến</NavDropdown.Item>
-              <NavDropdown.Item as={Link} to="/unishare?type=new">Khóa học mới</NavDropdown.Item>
-              <NavDropdown.Item as={Link} to="/unishare?type=free">Khóa học miễn phí</NavDropdown.Item>
-              <NavDropdown.Divider />
-              <NavDropdown.Item as={Link} to="/unishare">Tất cả khóa học</NavDropdown.Item>
-            </NavDropdown>            <NavDropdown title="Nhóm học" id="groups-dropdown">
+                     
+            <NavDropdown title="Nhóm học" id="groups-dropdown">
               <NavDropdown.Item as={Link} to="/unishare/popular-groups">Nhóm học phổ biến</NavDropdown.Item>
               <NavDropdown.Item as={Link} to="/unishare/new-groups">Nhóm học mới nhất</NavDropdown.Item>
               {isLoggedIn && (
@@ -292,9 +286,7 @@ const Header = () => {
                     )}
                     
                     <div className="mb-3">
-                      <h6 className="d-flex align-items-center">
-                        <FaBook className="me-2 text-primary" /> Khóa học
-                      </h6>
+
                       {searchResults.courses.length > 0 ? (
                         <ul className="list-unstyled">
                           {searchResults.courses.map(course => (
