@@ -15,6 +15,9 @@ import DocumentView from './pages/DocumentView';
 import EditDocument from './pages/EditDocument';
 import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
+import EchoTestPage from './pages/EchoTestPage';
+import DirectSocketTestPage from './pages/DirectSocketTestPage';
+import WebSocketTestPage from './pages/WebSocketTestPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import PopularGroupsPage from './pages/PopularGroupsPage';
 import NewStudyGroupsPage from './pages/NewStudyGroupsPage';
@@ -215,9 +218,13 @@ function App() {
           
           {/* New Study Groups Page */}
           <Route path="/unishare/new-groups" element={<NewStudyGroupsPage />} />
-          
-          {/* Terms of service page */}
+            {/* Terms of service page */}
           <Route path="/unishare/terms" element={<TermsOfServicePage />} />
+            {/* Echo WebSocket Test Page */}
+          <Route path="/test-echo" element={<EchoTestPage />} />
+          
+          {/* WebSocket Connection Test Page */}
+          <Route path="/test-websocket" element={<WebSocketTestPage />} />
           
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

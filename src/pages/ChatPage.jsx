@@ -28,15 +28,60 @@ const ChatPage = () => {
     chat: 0
   }); // Track last fetch time to prevent excessive API calls
   const currentChatIdRef = useRef(null); // Track current chatId to prevent unnecessary re-fetching
-
-  // Track component mount/unmount
+  // Track component mount/unmount and setup real-time events
   useEffect(() => {
     console.log('ChatPage mounted');
     isComponentMounted.current = true;
     
+    // Setup real-time event listeners
+    const handleNewMessage = (newMessage, chat) => {
+      console.log('Real-time: New message received in ChatPage', newMessage);
+      
+      // Only update if the message is for the current chat
+      if (newMessage.chat_id == chatId && isComponentMounted.current) {
+        setMessages(prevMessages => {
+          // Check if message already exists to avoid duplicates
+          const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
+          if (messageExists) {
+            return prevMessages;
+          }
+          return [...prevMessages, newMessage];
+        });
+        
+        // Auto-scroll to bottom if user was near bottom
+        if (isNearBottom.current) {
+          setTimeout(() => {
+            scrollToBottom('smooth');
+          }, 100);
+        }
+      }
+    };
+
+    const handleChatUpdated = (updatedChat) => {
+      console.log('Real-time: Chat updated in ChatPage', updatedChat);
+      if (updatedChat.id == chatId && isComponentMounted.current) {
+        setChat(updatedChat);
+      }
+    };
+
+    // Subscribe to real-time events
+    const isRealTimeSetup = chatService.subscribeToRealTimeEvents(
+      handleNewMessage,
+      handleChatUpdated,
+      null // Don't need chat list updates in ChatPage
+    );
+
+    if (!isRealTimeSetup) {
+      console.log('Real-time setup failed, falling back to polling');
+      // Keep the polling as fallback
+    }
+    
     return () => {
       console.log('ChatPage unmounted');
       isComponentMounted.current = false;
+      
+      // Clean up real-time listeners
+      chatService.unsubscribeFromAllEvents();
       
       // Clear any intervals when component unmounts
       if (pollIntervalRef.current) {
@@ -119,6 +164,7 @@ const ChatPage = () => {
       // Don't set error state for background polling
     }
   }, [chatId, chat]);
+  const [currentChatLoaded, setCurrentChatLoaded] = useState(false);
 
   // Fetch chat data and messages
   useEffect(() => {
@@ -130,6 +176,7 @@ const ChatPage = () => {
     
     console.log('ChatId changed from', currentChatIdRef.current, 'to', chatId);
     currentChatIdRef.current = chatId;
+    setCurrentChatLoaded(false); // Reset current chat loaded state
     
     // Clear any existing interval when chatId changes
     if (pollIntervalRef.current) {
@@ -176,32 +223,56 @@ const ChatPage = () => {
               console.log('ChatId changed during message fetch, aborting update');
               return;
             }
-            
-            if (messagesResponse && (messagesResponse.success === true || messagesResponse.data)) {
+              if (messagesResponse && (messagesResponse.success === true || messagesResponse.data)) {
               // Access data correctly based on the response structure
               const messagesData = messagesResponse.data?.data || messagesResponse.data || [];
               setMessages(messagesData);
               
-              // Mark chat as read
-              try {
-                await chatService.markChatAsRead(chatId);
-              } catch (markReadError) {
-                console.warn('Failed to mark chat as read:', markReadError);
-              }
-            } else {
-              console.warn('No messages data:', messagesResponse);
-              setMessages([]);
-            }
-          } catch (messagesError) {
-            console.error('Error loading messages:', messagesError);
-            if (isComponentMounted.current) {
-              setMessages([]);
-            }
-            // Don't set error state here to still show chat with empty messages
+              // Subscribe to real-time messages for this specific chat
+              chatService.subscribeToChat(chatId, (newMessage) => {
+                console.log('Real-time: New message in current chat', newMessage);
+                if (isComponentMounted.current && chatId === currentChatIdRef.current) {
+                  setMessages(prevMessages => {
+                    // Check if message already exists to avoid duplicates
+                    const messageExists = prevMessages.some(msg => msg.id === newMessage.id);
+                    if (messageExists) {
+                      return prevMessages;
+                    }
+                    return [...prevMessages, newMessage];
+                  });
+                  
+                  // Auto-scroll to bottom if user was near bottom
+                  if (isNearBottom.current) {
+                    setTimeout(() => {
+                      scrollToBottom('smooth');
+                    }, 100);
+                  }
+                }
+              });
+              
+              // Mark chat as read         
+           try {
+            await chatService.markChatAsRead(chatId);
+          } catch (markReadError) {
+            console.warn('Failed to mark chat as read:', markReadError);
           }
         } else {
-          throw new Error(chatResponse?.message || 'Không thể tải thông tin chat');
+          console.warn('No messages data:', messagesResponse);
+          setMessages([]);
         }
+      } catch (messagesError) {
+        console.error('Error loading messages:', messagesError);
+        if (isComponentMounted.current) {
+          setMessages([]);
+        }
+        // Don't set error state here to still show chat with empty messages
+      }
+      
+      // Set current chat loaded to true to trigger any dependent effects
+      setCurrentChatLoaded(true);
+    } else {
+      throw new Error(chatResponse?.message || 'Không thể tải thông tin chat');
+    }
       } catch (err) {
         console.error('Error loading chat:', err);
         if (isComponentMounted.current) {
@@ -212,44 +283,22 @@ const ChatPage = () => {
           setLoading(false);
         }
       }
-    };
-
-    fetchChatData();
+    };    fetchChatData();
     
-    // Set up polling with a delay to avoid rapid setup/teardown
-    const setupPolling = () => {
-      // Only set up polling if component is mounted, no interval is already set, and chatId is current
-      if (isComponentMounted.current && !pollIntervalRef.current && chatId === currentChatIdRef.current) {
-        console.log('Setting up polling for chat ID:', chatId);
-        pollIntervalRef.current = setInterval(() => {
-          // Only poll if component is mounted and chatId is still current
-          if (isComponentMounted.current && chatId === currentChatIdRef.current) {
-            console.log('Polling for new messages');
-            fetchNewMessages(false); // Pass false to respect throttling
-          } else {
-            // Safety check - clear interval if conditions no longer met
-            console.log('Conditions changed during polling, clearing interval');
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
-        }, 60000); // 60 seconds
-      }
-    };
-    
-    // Delay polling setup to avoid rapid setup/teardown
-    const pollingDelayTimer = setTimeout(setupPolling, 2000);
-    
+    // Cleanup previous chat subscription when switching chats
     return () => {
-      // Clean up
-      clearTimeout(pollingDelayTimer);
-      if (pollIntervalRef.current) {
-        console.log('Chat ID changed or component unmounting, cleaning up');
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+      if (currentChatIdRef.current) {
+        chatService.unsubscribeFromChat(currentChatIdRef.current);
       }
-    };
-  }, [chatId, fetchNewMessages]);
+    };  }, [chatId]);
   // Removed 'error' from dependencies to prevent re-running effect when error changes
+
+  // Scroll to bottom function
+  const scrollToBottom = (behavior = 'auto') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'nearest' });
+    }
+  };
 
   // Track if user is near bottom of chat
   const isNearBottom = useRef(true);

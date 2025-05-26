@@ -1,6 +1,7 @@
 import api, { apiRequestWithRetry } from './api';
 import cacheService from './cacheService';
 import { authService } from './index';
+import echo from './echoService';
 
 const chatService = {
   /**
@@ -8,8 +9,7 @@ const chatService = {
    * @param {Object} params - Query parameters like page, limit, etc.
    * @param {boolean} useCache - Whether to use cached data if available
    * @returns {Promise} Promise with user's chats
-   */
-  getUserChats: async (params = {}, useCache = true) => {
+   */  getUserChats: async (params = {}, useCache = true) => {
     // Tạo cache key từ params và user ID
     const user = authService.getUser();
     const userId = user?.id || 'anonymous';
@@ -17,6 +17,7 @@ const chatService = {
     
     // Sử dụng memoize để tránh duplicate calls
     if (useCache) {
+      console.log('Using cached user chats data');
       return cacheService.memoize(
         cacheKey,
         async () => {
@@ -55,6 +56,7 @@ const chatService = {
         }
       );
     } else {
+      console.log('Bypassing cache for user chats, fetching fresh data');
       try {
         const response = await api.get('/chats', { params });
         
@@ -563,6 +565,135 @@ const chatService = {
         error: error.response?.data || error.message
       };
     }
+  },
+
+  // Real-time event listeners
+  _listeners: new Map(),
+
+  /**
+   * Subscribe to real-time chat events
+   * @param {Function} onNewMessage - Callback for new messages
+   * @param {Function} onChatUpdated - Callback for chat updates
+   * @param {Function} onChatListUpdated - Callback for chat list updates
+   */
+  subscribeToRealTimeEvents: (onNewMessage, onChatUpdated, onChatListUpdated) => {
+    try {
+      // Listen for new messages on private channel for current user
+      const user = authService.getUser();
+      if (user && user.id) {
+        const userChannel = echo.private(`chat.user.${user.id}`);
+        
+        // Listen for new messages
+        userChannel.listen('MessageSent', (e) => {
+          console.log('Real-time: New message received', e);
+          if (onNewMessage) {
+            onNewMessage(e.message, e.chat);
+          }
+        });
+
+        // Listen for chat updates
+        userChannel.listen('ChatUpdated', (e) => {
+          console.log('Real-time: Chat updated', e);
+          if (onChatUpdated) {
+            onChatUpdated(e.chat);
+          }
+        });
+
+        // Store listeners for cleanup
+        chatService._listeners.set('userChannel', userChannel);
+      }
+
+      // Listen for general chat events
+      if (onChatListUpdated) {
+        const generalChannel = echo.channel('chats');
+        generalChannel.listen('ChatCreated', (e) => {
+          console.log('Real-time: New chat created', e);
+          if (onChatListUpdated) {
+            onChatListUpdated();
+          }
+        });
+
+        chatService._listeners.set('generalChannel', generalChannel);
+      }
+    } catch (error) {
+      console.error('Error setting up real-time listeners:', error);
+      // Fallback to polling if WebSocket fails
+      return false;
+    }
+    return true;
+  },
+
+  /**
+   * Subscribe to a specific chat for real-time messages
+   * @param {Number} chatId - Chat ID to subscribe to
+   * @param {Function} onNewMessage - Callback for new messages
+   */
+  subscribeToChat: (chatId, onNewMessage) => {
+    try {
+      const chatChannel = echo.private(`chat.${chatId}`);
+      
+      chatChannel.listen('MessageSent', (e) => {
+        console.log(`Real-time: New message in chat ${chatId}`, e);
+        if (onNewMessage) {
+          onNewMessage(e.message);
+        }
+      });
+
+      // Store listener for cleanup
+      chatService._listeners.set(`chat.${chatId}`, chatChannel);
+      return true;
+    } catch (error) {
+      console.error(`Error subscribing to chat ${chatId}:`, error);
+      return false;
+    }
+  },
+
+  /**
+   * Unsubscribe from a specific chat
+   * @param {Number} chatId - Chat ID to unsubscribe from
+   */
+  unsubscribeFromChat: (chatId) => {
+    const channelKey = `chat.${chatId}`;
+    if (chatService._listeners.has(channelKey)) {
+      try {
+        const channel = chatService._listeners.get(channelKey);
+        channel.stopListening('MessageSent');
+        echo.leave(`chat.${chatId}`);
+        chatService._listeners.delete(channelKey);
+        console.log(`Unsubscribed from chat ${chatId}`);
+      } catch (error) {
+        console.error(`Error unsubscribing from chat ${chatId}:`, error);
+      }
+    }
+  },
+
+  /**
+   * Clean up all real-time listeners
+   */
+  unsubscribeFromAllEvents: () => {
+    chatService._listeners.forEach((channel, key) => {
+      try {
+        if (key.startsWith('chat.')) {
+          channel.stopListening('MessageSent');
+          const chatId = key.split('.')[1];
+          echo.leave(`chat.${chatId}`);
+        } else if (key === 'userChannel') {
+          channel.stopListening('MessageSent');
+          channel.stopListening('ChatUpdated');
+          const user = authService.getUser();
+          if (user?.id) {
+            echo.leave(`chat.user.${user.id}`);
+          }
+        } else if (key === 'generalChannel') {
+          channel.stopListening('ChatCreated');
+          echo.leave('chats');
+        }
+      } catch (error) {
+        console.error(`Error cleaning up listener ${key}:`, error);
+      }
+    });
+    chatService._listeners.clear();
+    console.log('All real-time listeners cleaned up');
   },
 };
 
