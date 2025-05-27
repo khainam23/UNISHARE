@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Navbar, Nav, Container, Button, NavDropdown, Image, Badge, Form, InputGroup, Dropdown } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaBell, FaSearch, FaBook, FaUsers, FaFile } from 'react-icons/fa';
+import { FaBell, FaSearch, FaBook, FaUsers, FaFile, FaRobot } from 'react-icons/fa';
 import uniShareLogo from '../assets/unishare-logo.png';
 import userAvatar from '../assets/avatar-1.png';
 import { authService, homeService, groupService } from '../services';
@@ -211,10 +211,14 @@ const Header = () => {
           />
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="me-auto">
+        <Navbar.Collapse id="basic-navbar-nav">          <Nav className="me-auto">
             <Nav.Link as={Link} to="/">Trang chủ</Nav.Link>
-            <Nav.Link as={Link} to="/unishare">UniShare</Nav.Link>
+            <Nav.Link as={Link} to="/unishare">UniShare</Nav.Link>            {isLoggedIn && (
+              <Nav.Link as={Link} to="/ai-chat">
+                <FaRobot className="me-1" />
+                Trò chuyện AI
+              </Nav.Link>
+            )}
                      
             <NavDropdown title="Nhóm học" id="groups-dropdown">
               <NavDropdown.Item as={Link} to="/unishare/popular-groups">Nhóm học phổ biến</NavDropdown.Item>

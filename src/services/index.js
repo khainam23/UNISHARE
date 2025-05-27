@@ -4,6 +4,7 @@ import homeService from './homeService';
 import profileService from './profileService';
 import adminService from './adminService';
 import chatService from './chatService';
+import aiChatService from './aiChatService';
 import groupService from './groupService';
 import cacheService from './cacheService';
 import postService from './postService';
@@ -18,6 +19,7 @@ export {
   homeService,
   adminService,
   chatService,
+  aiChatService,
   groupService,
   cacheService,
   postService,

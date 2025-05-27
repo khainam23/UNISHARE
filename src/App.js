@@ -15,6 +15,7 @@ import DocumentView from './pages/DocumentView';
 import EditDocument from './pages/EditDocument';
 import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
+import AIChatPage from './pages/AIChatPage';
 import EchoTestPage from './pages/EchoTestPage';
 import DirectSocketTestPage from './pages/DirectSocketTestPage';
 import WebSocketTestPage from './pages/WebSocketTestPage';
@@ -208,12 +209,25 @@ function App() {
             <ProtectedRoute>
               <GroupDetailPage />
             </ProtectedRoute>
-          } />
-          <Route path="/unishare/chats/:chatId" element={
+          } />          <Route path="/unishare/chats/:chatId" element={
             <ProtectedRoute>
               <ChatPage />
             </ProtectedRoute>
-          } />          {/* Popular Groups Page */}
+          } />
+          
+          {/* AI Chat routes */}
+          <Route path="/ai-chat" element={
+            <ProtectedRoute>
+              <AIChatPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/ai-chat/:chatId" element={
+            <ProtectedRoute>
+              <AIChatPage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Popular Groups Page */}
           <Route path="/unishare/popular-groups" element={<PopularGroupsPage />} />
           
           {/* New Study Groups Page */}

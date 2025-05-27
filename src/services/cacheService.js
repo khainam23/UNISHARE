@@ -78,8 +78,7 @@ const cacheService = {
       console.error('Error removing from cache:', error);
     }
   },
-  
-  /**
+    /**
    * Remove all values from cache that match a pattern
    * @param {string} pattern - Pattern to match against cache keys
    */
@@ -107,6 +106,14 @@ const cacheService = {
     } catch (error) {
       console.error('Error removing pattern from cache:', error);
     }
+  },
+
+  /**
+   * Alias for removeByPattern for backward compatibility
+   * @param {string} pattern - Pattern to match against cache keys
+   */
+  clearByPattern: (pattern) => {
+    return cacheService.removeByPattern(pattern);
   },
   
   /**
