@@ -112,11 +112,7 @@ export const getRedirectPathForUser = (user) => {
     return '/moderator/dashboard';
   }
   
-  // Third, check for lecturer role
-  if (isLecturer(user)) {
-    return '/teacher/dashboard';
-  }
-  
-  // Default to home page for students or other roles
+  // For lecturers and students, redirect to home page
+  // (Previously lecturers were redirected to /teacher/dashboard)
   return '/';
 };
