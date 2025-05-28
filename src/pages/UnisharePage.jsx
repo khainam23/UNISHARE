@@ -321,13 +321,10 @@ const UnisharePage = () => {
             onChatCreated={handleDataUpdated}
           />
         );
-      
-      case 'home':
+        case 'home':
       default:
         return (
           <>
-            <UnishareWelcomeBanner />
-            
             {/* Search and Filters Section */}
             <div className="bg-white rounded shadow-sm p-4 mb-4" style={{ border: '2px solid #b3d8f6', borderRadius: '1rem' }}>
               <div className="d-flex justify-content-between align-items-center mb-4">

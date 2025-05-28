@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FaHome, FaChartBar, FaBook, FaUsers, FaUserFriends, 
-         FaUserShield, FaKey, FaCog, FaQuestionCircle,
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FaChartBar, FaBook, FaUsers, FaUserFriends, 
+         FaUserShield, FaKey, FaSignOutAlt,
          FaBars, FaTimes } from 'react-icons/fa';
+import { authService } from '../../services';
 
 const NavItem = ({ icon: Icon, text, link, active, collapsed }) => (
   <Link
@@ -27,6 +28,7 @@ const Sidebar = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
 
   // Check screen size and adjust sidebar state
@@ -50,7 +52,6 @@ const Sidebar = () => {
 
   // Group menu items based on functionality areas from the permission structure
   const menuItems = [
-    { icon: FaHome, text: 'Trang Chủ', link: '/admin/home', active: currentPath === '/admin/home' },
     { icon: FaChartBar, text: 'Dashboard', link: '/admin/dashboard', active: currentPath === '/admin/dashboard' },
     { icon: FaBook, text: 'Quản Lý Tài Liệu', link: '/admin/documents', active: currentPath.includes('/admin/documents') },
     { icon: FaUsers, text: 'Quản Lý Người Dùng', link: '/admin/users', active: currentPath === '/admin/users' },
@@ -59,10 +60,28 @@ const Sidebar = () => {
     { icon: FaKey, text: 'Quản Lý Phân Quyền', link: '/admin/permissions', active: currentPath === '/admin/permissions' },
   ];
 
-  const otherItems = [
-    { icon: FaCog, text: 'Cài Đặt', link: '/admin/settings', active: currentPath === '/admin/settings' },
-    { icon: FaQuestionCircle, text: 'Giúp Đỡ', link: '/admin/help', active: currentPath === '/admin/help' },
-  ];
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      
+      // Clear all authentication data from local storage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('user');
+      
+      // Clear any other application-specific stored data
+      localStorage.removeItem('last_activity');
+      localStorage.removeItem('app_settings');
+      
+      // Redirect to home page
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Force redirect even if logout API fails
+      navigate('/');
+    }
+  };
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -140,16 +159,21 @@ const Sidebar = () => {
           
           <div className="sidebar-divider my-3"></div>
           
-          {otherItems.map((item, index) => (
-            <NavItem 
-              key={index}
-              icon={item.icon}
-              text={item.text}
-              link={item.link}
-              active={item.active}
-              collapsed={collapsed}
-            />
-          ))}
+          <button
+            onClick={handleLogout}
+            className={`nav-link d-flex align-items-center py-3 px-3 rounded-3 mb-2 w-100 border-0`}
+            style={{
+              color: '#5A5A5A',
+              backgroundColor: 'transparent',
+              fontSize: '14px',
+              fontWeight: '400'
+            }}
+          >
+            <div className="me-3 d-flex align-items-center justify-content-center" style={{ width: '20px' }}>
+              <FaSignOutAlt size={16} />
+            </div>
+            {!collapsed && <span>Đăng Xuất</span>}
+          </button>
         </div>
       </div>
       

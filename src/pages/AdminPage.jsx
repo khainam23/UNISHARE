@@ -72,11 +72,16 @@ const AdminPage = () => {
   // Update activeTab when URL parameter changes
   useEffect(() => {
     if (tab) {
+      // Redirect home to dashboard
+      if (tab === 'home') {
+        navigate('/admin/dashboard', { replace: true });
+        return;
+      }
       setActiveTab(tab);
     } else {
       setActiveTab('dashboard');
     }
-  }, [tab]);
+  }, [tab, navigate]);
 
   // Fetch dashboard stats when dashboard tab is active
   useEffect(() => {
