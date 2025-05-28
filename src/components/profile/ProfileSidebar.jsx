@@ -39,7 +39,6 @@ const ProfileSidebar = ({ activeSection }) => {
     { icon: <BsPencilSquare size={20} className="me-2" />, text: 'Chỉnh sửa thông tin', pathSuffix: 'edit', basePath: 'profile', id: 'edit' },
     { icon: <BsKey size={20} className="me-2" />, text: 'Đổi mật khẩu', pathSuffix: 'change-password', basePath: 'profile', id: 'change-password' },
     { icon: <BsFileEarmarkText size={20} className="me-2" />, text: 'Tài liệu', pathSuffix: 'documents', basePath: 'profile', id: 'documents' },
-    { icon: <BsClockHistory size={20} className="me-2" />, text: 'Lịch sử tham gia', pathSuffix: 'history', basePath: 'profile', id: 'history' },
     { icon: <BsPeople size={20} className="me-2" />, text: 'Nhóm học', pathSuffix: 'groups', basePath: 'profile', id: 'groups' }
   ];
 

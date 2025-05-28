@@ -9,7 +9,6 @@ import ProfileAvatarSection from '../components/profile/ProfileAvatarSection';
 import EditProfileInfoForm from '../components/profile/EditProfileInfoForm';
 import ChangePasswordForm from '../components/profile/ChangePasswordForm';
 import DocumentsList from '../components/profile/DocumentsList';
-import ParticipationHistory from '../components/profile/ParticipationHistory';
 import CurrentGroups from '../components/profile/CurrentGroups';
 import { authService } from '../services';
 
@@ -103,11 +102,6 @@ const ProfilePage = () => {
       currentTitle = "Tài liệu của tôi";
       currentDescription = "";
       ContentComponent = <DocumentsList />;
-      break;
-    case 'history':
-      currentTitle = "Lịch sử hoạt động";
-      currentDescription = "";
-      ContentComponent = <ParticipationHistory />;
       break;
     case 'groups':
       currentTitle = "Nhóm đang tham gia";
