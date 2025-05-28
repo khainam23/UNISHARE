@@ -16,30 +16,37 @@ const RegisterForm = () => {
     student_id: '',
     bio: '',
   });
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [generalError, setGeneralError] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const navigate = useNavigate();
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setUserData({
       ...userData,
       [name]: value,
     });
+    
+    // Clear error for this field when user types
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
+    }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!agreeTerms) {
-      setError('Bạn cần đồng ý với Điều khoản dịch vụ để tiếp tục');
+      setGeneralError('Bạn cần đồng ý với Điều khoản dịch vụ để tiếp tục');
       return;
     }
     
     setLoading(true);
-    setError('');
+    setErrors({});
+    setGeneralError('');
 
     try {
       const response = await authService.register(userData);
@@ -54,21 +61,26 @@ const RegisterForm = () => {
       // Redirect to appropriate page
       navigate(redirectPath);
     } catch (err) {
-      setError(
-        err.message || 
-        'Đăng ký không thành công. Vui lòng thử lại.'
-      );
+      console.error("Registration error:", err);
+      
+      if (err.errors) {
+        // Server returned field-specific validation errors
+        setErrors(err.errors);
+      } else {
+        setGeneralError(
+          err.message || 
+          'Đăng ký không thành công. Vui lòng thử lại.'
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <>
-      {error && <Alert variant="danger">{error}</Alert>}
+      {generalError && <Alert variant="danger">{generalError}</Alert>}
       
-      <Form onSubmit={handleSubmit}>
-        <Form.Group className="mb-3" controlId="name">
+      <Form onSubmit={handleSubmit}>        <Form.Group className="mb-3" controlId="name">
           <Form.Label>Họ và tên</Form.Label>
           <Form.Control
             type="text"
@@ -76,11 +88,13 @@ const RegisterForm = () => {
             value={userData.name}
             onChange={handleChange}
             placeholder="Nhập họ và tên"
+            isInvalid={!!errors.name}
             required
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="email">
+          <Form.Control.Feedback type="invalid">
+            {errors.name}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="email">
           <Form.Label>Email</Form.Label>
           <Form.Control
             type="email"
@@ -88,11 +102,13 @@ const RegisterForm = () => {
             value={userData.email}
             onChange={handleChange}
             placeholder="Nhập email"
+            isInvalid={!!errors.email}
             required
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="phone">
+          <Form.Control.Feedback type="invalid">
+            {errors.email}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="phone">
           <Form.Label>Số điện thoại</Form.Label>
           <Form.Control
             type="tel"
@@ -100,11 +116,13 @@ const RegisterForm = () => {
             value={userData.phone}
             onChange={handleChange}
             placeholder="Nhập số điện thoại"
+            isInvalid={!!errors.phone}
             required
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="password">
+          <Form.Control.Feedback type="invalid">
+            {errors.phone}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="password">
           <Form.Label>Mật khẩu</Form.Label>
           <Form.Control
             type="password"
@@ -112,11 +130,13 @@ const RegisterForm = () => {
             value={userData.password}
             onChange={handleChange}
             placeholder="Tạo mật khẩu"
+            isInvalid={!!errors.password}
             required
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="password_confirmation">
+          <Form.Control.Feedback type="invalid">
+            {errors.password}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="password_confirmation">
           <Form.Label>Xác nhận mật khẩu</Form.Label>
           <Form.Control
             type="password"
@@ -124,11 +144,13 @@ const RegisterForm = () => {
             value={userData.password_confirmation}
             onChange={handleChange}
             placeholder="Nhập lại mật khẩu"
+            isInvalid={!!errors.password_confirmation}
             required
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="university">
+          <Form.Control.Feedback type="invalid">
+            {errors.password_confirmation}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="university">
           <Form.Label>Trường đại học</Form.Label>
           <Form.Control
             type="text"
@@ -136,10 +158,12 @@ const RegisterForm = () => {
             value={userData.university}
             onChange={handleChange}
             placeholder="Nhập tên trường đại học"
+            isInvalid={!!errors.university}
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="department">
+          <Form.Control.Feedback type="invalid">
+            {errors.university}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="department">
           <Form.Label>Ngành học</Form.Label>
           <Form.Control
             type="text"
@@ -147,10 +171,12 @@ const RegisterForm = () => {
             value={userData.department}
             onChange={handleChange}
             placeholder="Nhập ngành học"
+            isInvalid={!!errors.department}
           />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="student_id">
+          <Form.Control.Feedback type="invalid">
+            {errors.department}
+          </Form.Control.Feedback>
+        </Form.Group>        <Form.Group className="mb-3" controlId="student_id">
           <Form.Label>Mã sinh viên</Form.Label>
           <Form.Control
             type="text"
@@ -158,7 +184,11 @@ const RegisterForm = () => {
             value={userData.student_id}
             onChange={handleChange}
             placeholder="Nhập mã sinh viên"
+            isInvalid={!!errors.student_id}
           />
+          <Form.Control.Feedback type="invalid">
+            {errors.student_id}
+          </Form.Control.Feedback>
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="terms">

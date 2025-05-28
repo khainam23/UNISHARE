@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Form, InputGroup, Card, Spinner, Badge, Alert, Modal, Pagination, Row, Col, Dropdown } from 'react-bootstrap';
 import { FaSearch, FaEye, FaEdit, FaTrash, FaCheck, FaTimes, FaFileAlt, FaFilePdf, FaFileWord, FaFileExcel, FaEllipsisV } from 'react-icons/fa';
 import { adminService } from '../../services';
+import DocumentPreviewModal from './DocumentPreviewModal';
 
 const DocumentsManagement = () => {
   const [documents, setDocuments] = useState([]);
@@ -19,6 +20,7 @@ const DocumentsManagement = () => {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
@@ -96,7 +98,7 @@ const DocumentsManagement = () => {
   // Action handlers
   const handleView = (document) => {
     setSelectedDocument(document);
-    setShowViewModal(true);
+    setShowPreviewModal(true);
   };
 
   const handleApprove = (document) => {
@@ -665,6 +667,13 @@ const DocumentsManagement = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        show={showPreviewModal}
+        onHide={() => setShowPreviewModal(false)}
+        document={selectedDocument}
+      />
     </div>
   );
 };

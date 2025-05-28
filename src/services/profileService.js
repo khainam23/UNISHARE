@@ -812,7 +812,6 @@ const profileService = {
       throw error.response ? error.response.data : error;
     }
   },
-
   /**
    * Upload a new document
    * @param {FormData} formData - Form data with document file and metadata
@@ -820,6 +819,24 @@ const profileService = {
    */
   uploadDocument: async (formData) => {
     try {
+      // Try to determine user role from localStorage
+      const userData = localStorage.getItem('user');
+      let isTeacher = false;
+      
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          if (user.roles && Array.isArray(user.roles)) {
+            isTeacher = user.roles.some(r => 
+              (typeof r === 'object' && r.name === 'lecturer') || 
+              (typeof r === 'string' && r === 'lecturer')
+            );
+          }
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
       // First, check if the file already exists by calculating hash
       // This is optional - you can skip this step and directly handle the error
       const file = formData.get('file');
@@ -852,8 +869,12 @@ const profileService = {
         }
       }
       
-      // Proceed with normal upload
-      const response = await api.post('/student/documents', formData, {
+      // Use the appropriate endpoint based on user role
+      const endpoint = isTeacher ? '/teacher/documents' : '/student/documents';
+      console.log('Using upload endpoint:', endpoint, 'for user role:', isTeacher ? 'lecturer' : 'student');
+      
+      // Proceed with role-appropriate upload
+      const response = await api.post(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

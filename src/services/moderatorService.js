@@ -91,7 +91,6 @@ const moderatorService = {
       throw error.response ? error.response.data : error;
     }
   },
-
   /**
    * Get document details with normalized user data
    */
@@ -99,16 +98,19 @@ const moderatorService = {
     try {
       const response = await api.get(`/moderator/documents/${documentId}`);
       
+      // Handle the response structure - backend returns { success: true, data: document }
+      const documentData = response.data.data || response.data;
+      
       // Normalize user information if missing
-      if (response.data && !response.data.user && response.data.user_id) {
-        response.data.user = {
-          id: response.data.user_id,
-          name: `User ${response.data.user_id}`,
+      if (documentData && !documentData.user && documentData.user_id) {
+        documentData.user = {
+          id: documentData.user_id,
+          name: `User ${documentData.user_id}`,
           placeholder: true
         };
       }
       
-      return response.data;
+      return documentData;
     } catch (error) {
       console.error('Error fetching document details:', error);
       throw error.response ? error.response.data : error;

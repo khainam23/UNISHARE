@@ -12,8 +12,7 @@ let userDataCache = {
 // Cache expiration time (5 minutes)
 const CACHE_EXPIRATION = 5 * 60 * 1000;
 
-class AuthService {
-  // Register a new user
+class AuthService {  // Register a new user
   async register(userData) {
     try {
       // Get CSRF token before making the request
@@ -30,7 +29,31 @@ class AuthService {
       }
       return response.data;
     } catch (error) {
-      throw error.response ? error.response.data : error;
+      console.error('Registration error:', error);
+      
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        // Handle validation errors (422)
+        if (status === 422 && data.errors) {
+          throw {
+            message: data.message || 'Validation failed',
+            errors: data.errors
+          };
+        }
+        
+        // Handle other server errors
+        if (data.message) {
+          throw { message: data.message };
+        }
+        
+        // Generic server error
+        throw { message: 'Đăng ký không thành công. Vui lòng thử lại.' };
+      }
+      
+      // Network or other errors
+      throw { message: 'Lỗi kết nối. Vui lòng kiểm tra internet và thử lại.' };
     }
   }
 
