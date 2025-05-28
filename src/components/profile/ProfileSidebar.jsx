@@ -1,48 +1,54 @@
 import React, { useContext, useEffect } from 'react';
 import { Nav, Image, Spinner } from 'react-bootstrap';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   BsPersonCircle, BsPencilSquare, BsKey, BsFileEarmarkText, BsClockHistory,
-  BsPeople, BsBook, BsGear, BsShieldCheck
+  BsPeople, BsBoxArrowRight
 } from 'react-icons/bs';
 import defaultAvatar from '../../assets/avatar-1.png';
 import { ProfileContext } from '../../pages/ProfilePage';
+import { authService } from '../../services';
 
 const ProfileSidebar = ({ activeSection }) => {
   const { userData: user, loading } = useContext(ProfileContext);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      
+      // Clear all authentication data from local storage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('user');
+      
+      // Clear any other application-specific stored data
+      localStorage.removeItem('last_activity');
+      localStorage.removeItem('app_settings');
+      
+      // Redirect to home page
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const sidebarNavItems = [
-    {
-      icon: <BsPersonCircle size={20} className="me-2" />,
-      text: 'Hồ sơ cá nhân',
-      basePath: 'profile',
-      subItems: [
-        { text: 'Hồ sơ tài khoản', pathSuffix: undefined, id: 'details' },
-        { text: 'Chỉnh sửa thông tin', pathSuffix: 'edit', id: 'edit' },
-        { text: 'Đổi mật khẩu', pathSuffix: 'change-password', id: 'change-password' }
-      ]
-    },
+    { icon: <BsPersonCircle size={20} className="me-2" />, text: 'Hồ sơ cá nhân', pathSuffix: undefined, basePath: 'profile', id: 'details' },
+    { icon: <BsPencilSquare size={20} className="me-2" />, text: 'Chỉnh sửa thông tin', pathSuffix: 'edit', basePath: 'profile', id: 'edit' },
+    { icon: <BsKey size={20} className="me-2" />, text: 'Đổi mật khẩu', pathSuffix: 'change-password', basePath: 'profile', id: 'change-password' },
     { icon: <BsFileEarmarkText size={20} className="me-2" />, text: 'Tài liệu', pathSuffix: 'documents', basePath: 'profile', id: 'documents' },
     { icon: <BsClockHistory size={20} className="me-2" />, text: 'Lịch sử tham gia', pathSuffix: 'history', basePath: 'profile', id: 'history' },
-    { icon: <BsPeople size={20} className="me-2" />, text: 'Nhóm học', pathSuffix: 'groups', basePath: 'profile', id: 'groups' },
-    { icon: <BsBook size={20} className="me-2" />, text: 'Hướng dẫn sử dụng', pathSuffix: 'guides', basePath: 'profile', id: 'guides' },
-    { icon: <BsGear size={20} className="me-2" />, text: 'Cài đặt', pathSuffix: 'settings', basePath: 'profile', id: 'settings' },
-    { icon: <BsShieldCheck size={20} className="me-2" />, text: 'Điều khoản người dùng', pathSuffix: 'terms', basePath: 'profile', id: 'terms' }
+    { icon: <BsPeople size={20} className="me-2" />, text: 'Nhóm học', pathSuffix: 'groups', basePath: 'profile', id: 'groups' }
   ];
 
   const getFullPath = (basePath, pathSuffix) => {
     return pathSuffix ? `/${basePath}/${pathSuffix}` : `/${basePath}`;
   };
 
-  const isActive = (item, subItem = null) => {
+  const isActive = (item) => {
     const currentSection = activeSection || 'details';
-
-    if (subItem) {
-      return currentSection === subItem.id;
-    }
-    if (item.subItems) {
-      return item.subItems.some(sub => currentSection === sub.id);
-    }
     return currentSection === item.id;
   };
 
@@ -77,42 +83,23 @@ const ProfileSidebar = ({ activeSection }) => {
 
       <Nav className="flex-column profile-nav">
         {sidebarNavItems.map((item, index) => (
-          <React.Fragment key={item.id || index}>
-            {item.subItems ? (
-              <>
-                <Nav.Link
-                  as={Link}
-                  to={getFullPath(item.basePath, item.subItems.find(sub => isActive(item, sub))?.pathSuffix || item.subItems[0].pathSuffix)}
-                  className={`d-flex align-items-center ${isActive(item) ? 'active' : ''}`}
-                >
-                  {item.icon} {item.text} <span className="ms-auto">{isActive(item) ? '▼' : '▶'}</span>
-                </Nav.Link>
-                {isActive(item) && (
-                  <Nav className="flex-column ms-3">
-                    {item.subItems.map((subItem) => (
-                      <Nav.Link
-                        key={subItem.id}
-                        as={Link}
-                        to={getFullPath(item.basePath, subItem.pathSuffix)}
-                        className={isActive(item, subItem) ? 'active-subitem fw-bold' : ''}
-                      >
-                        {subItem.text}
-                      </Nav.Link>
-                    ))}
-                  </Nav>
-                )}
-              </>
-            ) : (
-              <Nav.Link
-                as={Link}
-                to={getFullPath(item.basePath, item.pathSuffix)}
-                className={`d-flex align-items-center ${isActive(item) ? 'active' : ''}`}
-              >
-                {item.icon} {item.text}
-              </Nav.Link>
-            )}
-          </React.Fragment>
+          <Nav.Link
+            key={item.id || index}
+            as={Link}
+            to={getFullPath(item.basePath, item.pathSuffix)}
+            className={`d-flex align-items-center ${isActive(item) ? 'active' : ''}`}
+          >
+            {item.icon} {item.text}
+          </Nav.Link>
         ))}
+        
+        <Nav.Link
+          onClick={handleLogout}
+          className="d-flex align-items-center text-danger cursor-pointer"
+          style={{ cursor: 'pointer' }}
+        >
+          <BsBoxArrowRight size={20} className="me-2" /> Đăng xuất
+        </Nav.Link>
       </Nav>
     </div>
   );

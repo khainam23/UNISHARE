@@ -165,7 +165,7 @@ const ProfilePage = () => {
           <Row>
             {/* Sidebar */}
             <Col md={3}>
-              <ProfileSidebar activeSection={section || 'profile'} />
+              <ProfileSidebar activeSection={section || 'details'} />
             </Col>
 
             {/* Main Content */}
