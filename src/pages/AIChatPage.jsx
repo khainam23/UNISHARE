@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Row, Col, Card, Form, Button, Spinner, Alert, Badge } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaPaperPlane, FaRobot, FaArrowLeft, FaTrash, FaCog, FaChevronDown } from 'react-icons/fa';
+import { FaPaperPlane, FaRobot, FaArrowLeft, FaTrash, FaChevronDown, FaPlus } from 'react-icons/fa';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { aiChatService, authService } from '../services';
@@ -57,8 +57,8 @@ const AIChatPage = () => {
   // Monitor messages changes to update scroll button visibility
   useEffect(() => {
     if (messages.length > 0 && messagesContainerRef.current) {
-      // Check scroll position after messages render
-      setTimeout(checkIfNearBottom, 100);
+      // Only check scroll position but don't auto-scroll
+      checkIfNearBottom();
     }
   }, [messages.length]);
 
@@ -78,30 +78,28 @@ const AIChatPage = () => {
         console.log('AI Chat data loaded:', chatData);
         
         setChat(chatData);
-          // Set messages from the chat data
+        // Set messages from the chat data
         if (chatData.messages && Array.isArray(chatData.messages)) {
           setMessages(chatData.messages);
         } else {
           setMessages([]);
         }
         
-        // Only scroll to bottom on initial load if this is a new chat with no messages
-        // or if user was previously at bottom
+        // Disable auto-scrolling on initial load of existing chats
         setTimeout(() => {
-          if (chatData.messages && chatData.messages.length === 0) {
-            // New empty chat - safe to scroll
+          if (!chatData.messages || chatData.messages.length === 0) {
+            // Only auto-scroll for new empty chats
             scrollToBottom('auto');
             isNearBottom.current = true;
             userHasScrolled.current = false;
           } else {
-            // Existing chat with messages - don't auto scroll, let user choose
-            // Just update the refs without scrolling
-            isNearBottom.current = false;
-            userHasScrolled.current = true;
-            setShowScrollButton(true);
+            // For existing chats with messages, don't auto-scroll
+            // Just update the button visibility
+            checkIfNearBottom();
           }
         }, 100);
-      } else {        console.error('Failed to load AI chat:', chatResponse.message);
+      } else {
+        console.error('Failed to load AI chat:', chatResponse.message);
         setError(chatResponse.message || 'Không thể tải dữ liệu AI chat');
       }
     } catch (error) {
@@ -116,46 +114,44 @@ const AIChatPage = () => {
     }
   };
   const scrollToBottom = (behavior = 'smooth') => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: behavior
+      });
     }
-  };  // Check if user is near bottom of messages container
+  };
+  // More precisely check if user is near bottom of messages container
   const checkIfNearBottom = () => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
       const threshold = 150; // pixels from bottom
       const nearBottom = scrollHeight - scrollTop - clientHeight < threshold;
       
-      // Update refs
-      const wasNearBottom = isNearBottom.current;
-      isNearBottom.current = nearBottom;
-      
-      // Update scroll button visibility - only show if:
-      // 1. Not near bottom AND
-      // 2. Has messages AND  
-      // 3. Container is scrollable
+      // Update scroll button visibility - only show if not near bottom and has scrollable content
       const shouldShowButton = !nearBottom && 
                               messages.length > 0 && 
                               scrollHeight > clientHeight;
-      setShowScrollButton(shouldShowButton);
-      
-      // If user scrolled up significantly, mark as scrolled
-      if (!nearBottom && !userHasScrolled.current) {
-        userHasScrolled.current = true;
-      }
-      // If user scrolled back to bottom, reset the flag
-      else if (nearBottom && userHasScrolled.current) {
-        userHasScrolled.current = false;
-      }
       
       console.log('Scroll check:', { 
         scrollTop, 
         scrollHeight, 
         clientHeight, 
-        nearBottom, 
-        userHasScrolled: userHasScrolled.current,
-        showButton: shouldShowButton
+        nearBottom,
+        shouldShowButton
       });
+      
+      // Update refs without triggering scroll
+      isNearBottom.current = nearBottom;
+      
+      // Only update the user scrolled flag if they've actively scrolled up
+      if (!nearBottom && scrollTop > 0) {
+        userHasScrolled.current = true;
+      } else if (nearBottom) {
+        userHasScrolled.current = false;
+      }
+      
+      setShowScrollButton(shouldShowButton);
     }
   };
   // Smart scroll: only auto-scroll if user is near bottom
@@ -194,15 +190,19 @@ const AIChatPage = () => {
       user: authService.getUser()
     };
     
-    setMessages(prevMessages => [...prevMessages, userMessage]);    // Show typing indicator
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+    
+    // Show typing indicator
     setIsTyping(true);
     
-    // Always scroll when user sends a message (they initiated the action)
+    // Auto-scroll only when the user sends a message (they initiated the action)
     setTimeout(() => {
-      scrollToBottom('smooth');
-      isNearBottom.current = true;
-      userHasScrolled.current = false;
-      setShowScrollButton(false);
+      if (messagesContainerRef.current) {
+        scrollToBottom('smooth');
+        isNearBottom.current = true;
+        userHasScrolled.current = false;
+        setShowScrollButton(false);
+      }
     }, 100);
     
     try {
@@ -266,9 +266,10 @@ const AIChatPage = () => {
             return newMessages;
           });        }
         
-        // Don't auto-scroll when AI responds - let user control scrolling
-        // Only scroll if user is already at bottom
+        // Don't auto-scroll when AI responds - only scroll if user was already at bottom
         setTimeout(() => {
+          // Re-check if user is near bottom and hasn't scrolled up since
+          checkIfNearBottom();
           if (isNearBottom.current && !userHasScrolled.current) {
             scrollToBottom('smooth');
           }
@@ -340,7 +341,7 @@ const AIChatPage = () => {
       <Header />
       
       <Container fluid className="flex-grow-1 py-4">
-        <Row className="h-100">
+        <Row className="h-100 g-4">
           {/* Sidebar */}
           <Col md={4} lg={3} className="mb-3 mb-md-0">
             <AIChatSidebar 
@@ -353,9 +354,9 @@ const AIChatPage = () => {
           {/* Main Chat Area */}
           <Col md={8} lg={9}>
             {activeChatId ? (
-              <Card className="h-100 d-flex flex-column">
+              <Card className="h-100 d-flex flex-column shadow-sm">
                 {/* Chat Header */}
-                <Card.Header className="d-flex justify-content-between align-items-center">
+                <Card.Header className="d-flex justify-content-between align-items-center py-3 bg-white border-bottom">
                   <div className="d-flex align-items-center">
                     <Button
                       variant="outline-secondary"
@@ -372,7 +373,7 @@ const AIChatPage = () => {
                       </h6>
                       {chat?.model && (
                         <small className="text-muted">
-                          <Badge variant="secondary" className="mt-1">
+                          <Badge bg="secondary" pill className="mt-1 px-2">
                             {chat.model}
                           </Badge>
                         </small>
@@ -494,17 +495,23 @@ const AIChatPage = () => {
               </Card>
             ) : (
               /* Welcome Screen */
-              <Card className="h-100 d-flex flex-column justify-content-center align-items-center text-center">
-                <Card.Body>
-                  <FaRobot size={96} className="text-primary mb-4 opacity-75" />                  <h3>Chào mừng đến với Trò chuyện AI</h3>
-                  <p className="text-muted mb-4">
+              <Card className="h-100 d-flex flex-column justify-content-center align-items-center text-center shadow-sm">
+                <Card.Body className="py-5">
+                  <div className="mb-4">
+                    <div className="p-4 rounded-circle bg-primary bg-opacity-10 d-inline-flex mb-3">
+                      <FaRobot size={96} className="text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="mb-3">Chào mừng đến với Trò chuyện AI</h3>
+                  <p className="text-muted mb-4 px-md-5">
                     Tạo cuộc trò chuyện AI mới hoặc chọn cuộc trò chuyện hiện có từ thanh bên để bắt đầu trò chuyện với AI.
                   </p>
                   <Button 
                     variant="primary" 
                     onClick={() => handleChatSelect(null)}
+                    className="rounded-pill px-4 py-2"
                   >
-                    <FaRobot className="me-2" />
+                    <FaPlus className="me-2" />
                     Bắt đầu Trò chuyện AI mới
                   </Button>
                 </Card.Body>

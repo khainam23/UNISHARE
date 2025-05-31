@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Card, Image, Spinner } from 'react-bootstrap';
 import { FaRobot, FaUser } from 'react-icons/fa';
 import userAvatar from '../../assets/avatar-1.png';
 
-const AIChatMessage = ({ message = {}, isAI = false, isTyping = false }) => {
+// Memoize the component to prevent unnecessary re-renders
+const AIChatMessage = memo(({ message = {}, isAI = false, isTyping = false }) => {
   // Format timestamp to readable date/time
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '';
@@ -118,6 +119,6 @@ const AIChatMessage = ({ message = {}, isAI = false, isTyping = false }) => {
       )}
     </div>
   );
-};
+});
 
 export default AIChatMessage;

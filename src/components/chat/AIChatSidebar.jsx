@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, ListGroup, Button, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
-import { FaPlus, FaRobot, FaTrash, FaEdit, FaComment } from 'react-icons/fa';
+import { FaPlus, FaRobot, FaTrash, FaEdit, FaComment, FaSearch } from 'react-icons/fa';
 import { aiChatService, authService } from '../../services';
 
 const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
@@ -14,6 +14,7 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
   const [newChatModel, setNewChatModel] = useState('gpt-4');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const isComponentMounted = useRef(true);
 
@@ -211,13 +212,19 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
     return date.toLocaleDateString('vi-VN');
   };
 
+  // Filter chats based on search term
+  const filteredChats = chats.filter(chat => 
+    chat.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
-      <Card className="h-100">        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h6 className="mb-0">
+      <Card className="h-100 shadow-sm">
+        <Card.Header className="d-flex justify-content-between align-items-center bg-primary text-white py-3">
+          <h5 className="mb-0 d-flex align-items-center">
             <FaRobot className="me-2" />
             Trò chuyện AI
-          </h6>
+          </h5>
         </Card.Header>
         <Card.Body className="d-flex justify-content-center align-items-center">
           <Spinner animation="border" variant="primary" />
@@ -228,20 +235,38 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
 
   return (
     <>
-      <Card className="h-100">
-        <Card.Header className="d-flex justify-content-between align-items-center">          <h6 className="mb-0">
+      <Card className="h-100 shadow-sm">
+        <Card.Header className="d-flex justify-content-between align-items-center bg-primary text-white py-3">
+          <h5 className="mb-0 d-flex align-items-center">
             <FaRobot className="me-2" />
             Trò chuyện AI
-          </h6>
+          </h5>
           <Button 
-            variant="primary" 
+            variant="light" 
             size="sm" 
             onClick={() => setShowNewChatModal(true)}
             title="Tạo cuộc trò chuyện AI mới"
+            className="rounded-circle"
+            style={{ width: '32px', height: '32px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <FaPlus />
           </Button>
         </Card.Header>
+        
+        <div className="px-3 pt-3 pb-2">
+          <Form.Group className="mb-2 position-relative">
+            <Form.Control
+              type="text"
+              placeholder="Tìm kiếm trò chuyện..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="ps-5"
+            />
+            <div className="position-absolute" style={{ left: '15px', top: '50%', transform: 'translateY(-50%)' }}>
+              <FaSearch className="text-secondary" />
+            </div>
+          </Form.Group>
+        </div>
         
         <Card.Body className="p-0" style={{ overflowY: 'auto' }}>
           {error && (
@@ -252,63 +277,80 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
           
           {chats.length === 0 ? (
             <div className="text-center p-4 text-muted">
-              <FaComment size={48} className="mb-3 opacity-50" />
-              <p>Chưa có cuộc trò chuyện AI nào</p>
-              <Button 
-                variant="outline-primary" 
-                size="sm"
-                onClick={() => setShowNewChatModal(true)}
-              >
-                Bắt đầu cuộc trò chuyện AI đầu tiên của bạn
-              </Button>
+              <div className="empty-state-container py-5">
+                <FaComment size={48} className="mb-3 opacity-50 text-primary" />
+                <p className="mb-4">Chưa có cuộc trò chuyện AI nào</p>
+                <Button 
+                  variant="primary" 
+                  size="sm"
+                  onClick={() => setShowNewChatModal(true)}
+                  className="rounded-pill px-3"
+                >
+                  <FaPlus className="me-2" />
+                  Bắt đầu cuộc trò chuyện đầu tiên
+                </Button>
+              </div>
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="text-center p-4 text-muted">
+              <FaSearch size={32} className="mb-3 opacity-50" />
+              <p>Không tìm thấy cuộc trò chuyện phù hợp</p>
             </div>
           ) : (
             <ListGroup variant="flush">
-              {chats.map((chat) => (
+              {filteredChats.map((chat) => (
                 <ListGroup.Item
                   key={chat.id}
                   action
                   active={activeChatId === chat.id}
                   onClick={() => onChatSelect && onChatSelect(chat.id)}
-                  className="d-flex justify-content-between align-items-start border-0"
-                  style={{ cursor: 'pointer' }}
+                  className={`border-0 py-3 px-3 ${activeChatId === chat.id ? 'active-chat' : 'chat-item'}`}
+                  style={{ 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    borderLeft: activeChatId === chat.id ? '4px solid #007bff' : '4px solid transparent',
+                    backgroundColor: activeChatId === chat.id ? 'rgba(0, 123, 255, 0.1)' : 'transparent'
+                  }}
                 >
-                  <div className="flex-grow-1">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <h6 className="mb-1 text-truncate" style={{ maxWidth: '180px' }}>
+                  <div className="d-flex flex-column">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <h6 className="mb-0 text-truncate text-dark" style={{ maxWidth: '170px' }}>
                         {chat.title || 'Cuộc trò chuyện không có tiêu đề'}
                       </h6>
-                      <div className="d-flex align-items-center">
+                      <div className="chat-actions opacity-75">
                         <Button
-                          variant="outline-secondary"
+                          variant="link"
                           size="sm"
-                          className="me-1 p-1"
+                          className="p-0 me-2 text-secondary"
                           onClick={(e) => handleEditClick(chat, e)}
                           title="Chỉnh sửa cuộc trò chuyện"
                         >
-                          <FaEdit size={12} />
+                          <FaEdit size={14} />
                         </Button>
                         <Button
-                          variant="outline-danger"
+                          variant="link"
                           size="sm"
-                          className="p-1"
+                          className="p-0 text-danger"
                           onClick={(e) => handleDeleteChat(chat.id, e)}
                           title="Xóa cuộc trò chuyện"
                         >
-                          <FaTrash size={12} />
+                          <FaTrash size={14} />
                         </Button>
                       </div>
                     </div>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <small className="text-muted">
+                    
+                    <div className="d-flex justify-content-between align-items-center mt-1">
+                      <div>
                         {chat.model && (
-                          <Badge variant="secondary" className="me-2">
+                          <Badge bg="secondary" pill className="me-2 px-2 py-1" style={{ fontSize: '0.7rem' }}>
                             {chat.model}
                           </Badge>
                         )}
-                        {chat.messages_count || 0} tin nhắn
-                      </small>
-                      <small className="text-muted">
+                        <Badge bg="light" text="dark" pill className="px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                          {chat.messages_count || 0} tin nhắn
+                        </Badge>
+                      </div>
+                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
                         {formatTimestamp(chat.updated_at)}
                       </small>
                     </div>
@@ -318,9 +360,23 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
             </ListGroup>
           )}
         </Card.Body>
-      </Card>      {/* New Chat Modal */}
-      <Modal show={showNewChatModal} onHide={() => setShowNewChatModal(false)}>
-        <Modal.Header closeButton>
+        
+        <Card.Footer className="bg-light p-3 d-flex justify-content-center">
+          <Button 
+            variant="primary" 
+            size="sm" 
+            onClick={() => setShowNewChatModal(true)}
+            className="rounded-pill px-3 w-100"
+          >
+            <FaPlus className="me-2" />
+            Tạo cuộc trò chuyện mới
+          </Button>
+        </Card.Footer>
+      </Card>
+      
+      {/* New Chat Modal */}
+      <Modal show={showNewChatModal} onHide={() => setShowNewChatModal(false)} centered>
+        <Modal.Header closeButton className="bg-primary text-white">
           <Modal.Title>Tạo Cuộc Trò Chuyện AI Mới</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -351,7 +407,8 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
             </Form.Group>
           </Form>
         </Modal.Body>
-        <Modal.Footer>          <Button variant="secondary" onClick={() => setShowNewChatModal(false)}>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowNewChatModal(false)}>
             Hủy
           </Button>
           <Button 
@@ -369,9 +426,11 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
             )}
           </Button>
         </Modal.Footer>
-      </Modal>      {/* Edit Chat Modal */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
+      </Modal>
+      
+      {/* Edit Chat Modal */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
+        <Modal.Header closeButton className="bg-primary text-white">
           <Modal.Title>Chỉnh Sửa Cuộc Trò Chuyện AI</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -402,7 +461,8 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
             </Form.Group>
           </Form>
         </Modal.Body>
-        <Modal.Footer>          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
             Hủy
           </Button>
           <Button 
@@ -421,6 +481,19 @@ const AIChatSidebar = ({ activeChatId, onChatSelect, onNewChat }) => {
           </Button>
         </Modal.Footer>
       </Modal>
+      
+      <style jsx>{`
+        .chat-item:hover {
+          background-color: rgba(0, 123, 255, 0.05);
+        }
+        .chat-actions {
+          visibility: hidden;
+        }
+        .chat-item:hover .chat-actions,
+        .active-chat .chat-actions {
+          visibility: visible;
+        }
+      `}</style>
     </>
   );
 };

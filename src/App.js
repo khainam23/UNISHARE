@@ -17,7 +17,6 @@ import GroupDetailPage from './pages/GroupDetailPage';
 import ChatPage from './pages/ChatPage';
 import AIChatPage from './pages/AIChatPage';
 import EchoTestPage from './pages/EchoTestPage';
-import DirectSocketTestPage from './pages/DirectSocketTestPage';
 import WebSocketTestPage from './pages/WebSocketTestPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import PopularGroupsPage from './pages/PopularGroupsPage';
@@ -29,7 +28,6 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { authService } from './services';
 import { isAdmin, isModerator } from './utils/roleUtils';
-import { Nav, Spinner, Alert } from 'react-bootstrap';
 
 // Protected route component for admin routes - only for admin users
 const AdminRoute = ({ children }) => {
@@ -123,7 +121,7 @@ const ModeratorRoute = ({ children }) => {
 
 // Protected route for authenticated users
 const ProtectedRoute = ({ children }) => {
-  const [authenticated, setAuthenticated] = useState(authService.isLoggedIn());
+  const [authenticated] = useState(authService.isLoggedIn());
   const navigate = useNavigate();
 
   useEffect(() => {
